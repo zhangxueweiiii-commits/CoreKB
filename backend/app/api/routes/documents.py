@@ -74,6 +74,32 @@ def _suggestion_read(suggestion: DocumentMetadataSuggestion, document: Document)
         "reviewed_at": suggestion.reviewed_at,
         "created_at": suggestion.created_at,
         "current_value": (document.meta or {}).get(suggestion.field),
+        "review_guardrails": _suggestion_review_guardrails(suggestion, document),
+    }
+
+
+def _suggestion_review_guardrails(suggestion: DocumentMetadataSuggestion, document: Document) -> dict:
+    current_value = (document.meta or {}).get(suggestion.field)
+    warnings: list[str] = []
+    if current_value not in (None, ""):
+        warnings.append("This field already has a formal metadata value. Review before replacing it.")
+    if suggestion.confidence.value == "low":
+        warnings.append("This suggestion has low confidence and needs careful review.")
+    if suggestion.normalization_source == "fallback":
+        warnings.append("This value was not matched by dictionary or rule normalization.")
+    return {
+        "requires_evidence_review": True,
+        "requires_current_value_review": current_value not in (None, ""),
+        "requires_custom_value_flag": suggestion.normalization_source == "fallback",
+        "reindex_required_on_accept": True,
+        "warnings": warnings,
+        "checklist": [
+            "Review the evidence excerpt.",
+            "Compare the suggestion with the current formal metadata value.",
+            "Confirm the normalization source.",
+            "Use custom_value=true for non-standard values.",
+            "Expect a single-document reindex after accept.",
+        ],
     }
 
 
@@ -301,13 +327,16 @@ def accept_metadata_suggestion(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metadata suggestion not found")
     if suggestion.field not in SUPPORTED_METADATA_FIELDS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported metadata field")
-    suggestion = DocumentMetadataSuggester(db).accept_suggestion(
-        document,
-        suggestion,
-        current_user,
-        payload.value if payload else None,
-        payload.custom_value if payload else False,
-    )
+    try:
+        suggestion = DocumentMetadataSuggester(db).accept_suggestion(
+            document,
+            suggestion,
+            current_user,
+            payload.value if payload else None,
+            payload.custom_value if payload else False,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     document.status = DocumentStatus.uploaded
     document.error_message = None
     document.indexed_at = None

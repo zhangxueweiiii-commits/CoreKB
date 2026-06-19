@@ -46,6 +46,7 @@ class DocumentMetadataSuggestionRead(BaseModel):
     reviewed_at: datetime | None = None
     created_at: datetime
     current_value: str | None = None
+    review_guardrails: dict = Field(default_factory=dict)
 
 
 class DocumentMetadataSuggestionAcceptRequest(BaseModel):
