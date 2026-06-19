@@ -119,11 +119,17 @@ class DocumentMetadataSuggester:
         custom_value: bool = False,
     ) -> DocumentMetadataSuggestion:
         raw_value = (value or suggestion.normalized_value or suggestion.suggested_value).strip()
+        if not raw_value:
+            raise ValueError("Accepted metadata value must not be empty")
         if custom_value:
             accepted_value = raw_value
             suggestion.custom_value = True
         else:
             normalized = self._normalize(suggestion.field, raw_value)
+            original_suggestion_value = (suggestion.normalized_value or suggestion.suggested_value or "").strip()
+            is_manual_override = value is not None and raw_value != original_suggestion_value
+            if is_manual_override and normalized.normalization_source == "fallback":
+                raise ValueError("Custom metadata values require custom_value=true")
             accepted_value = normalized.normalized_value
             suggestion.custom_value = False
             suggestion.raw_value = raw_value

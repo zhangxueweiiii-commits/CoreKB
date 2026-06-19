@@ -465,12 +465,25 @@ export function KnowledgeBaseDetail({
                     <td>
                       {suggestion.normalization_source}
                       {suggestion.dictionary_entry_id ? <div className="muted">Dictionary: {suggestion.dictionary_entry_id.slice(0, 8)}</div> : null}
+                      {suggestion.review_guardrails?.requires_custom_value_flag ? (
+                        <div className="muted">Custom flag required for non-standard overrides</div>
+                      ) : null}
                     </td>
                     <td>{suggestion.confidence}</td>
                     <td>{suggestion.source}</td>
                     <td>{suggestion.evidence_excerpt}</td>
                     <td>{suggestion.status}</td>
                     <td>
+                      {suggestion.review_guardrails?.warnings?.length ? (
+                        <div className="notice">
+                          {suggestion.review_guardrails.warnings.map((warning) => (
+                            <div key={warning}>{warning}</div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {suggestion.review_guardrails?.reindex_required_on_accept ? (
+                        <div className="muted">Accepting will submit a single-document reindex.</div>
+                      ) : null}
                       {canEdit && suggestion.status === "pending" && (
                         <>
                           <button type="button" onClick={() => acceptSuggestion(suggestion)}>Accept standard</button>

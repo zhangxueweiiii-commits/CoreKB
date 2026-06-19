@@ -9,7 +9,14 @@ from app.api.routes.documents import (
     generate_metadata_suggestions,
     reject_metadata_suggestion,
 )
-from app.models.document import Document, DocumentMetadataSuggestion, DocumentStatus
+from app.models.document import (
+    Document,
+    DocumentMetadataSuggestion,
+    DocumentMetadataSuggestionConfidence,
+    DocumentMetadataSuggestionSource,
+    DocumentMetadataSuggestionStatus,
+    DocumentStatus,
+)
 from app.models.index_job import IndexJob
 from app.models.knowledge_base import KBPermission, KBPermissionRole, KnowledgeBase, KnowledgeBaseVisibility
 from app.models.user import User, UserRole
@@ -98,6 +105,24 @@ def test_existing_metadata_is_not_overwritten_by_generate(db_session, tmp_path) 
     assert document.meta["equipment_model"] == "MANUAL-A200"
 
 
+def test_metadata_suggestion_response_includes_review_guardrails(db_session, tmp_path) -> None:
+    admin = make_user(db_session, "metadata-guardrail-admin")
+    kb = make_kb(db_session, admin)
+    document = make_document(db_session, kb, tmp_path, meta={"equipment_model": "MANUAL-A200"})
+
+    suggestions = generate_metadata_suggestions(document.id, admin, db_session)["items"]
+    suggestion = next(item for item in suggestions if item["field"] == "equipment_model")
+
+    guardrails = suggestion["review_guardrails"]
+    assert guardrails["requires_evidence_review"] is True
+    assert guardrails["requires_current_value_review"] is True
+    assert guardrails["reindex_required_on_accept"] is True
+    assert "Review the evidence excerpt." in guardrails["checklist"]
+    assert any("formal metadata value" in warning for warning in guardrails["warnings"])
+    assert suggestion["evidence_excerpt"]
+    assert suggestion["current_value"] == "MANUAL-A200"
+
+
 def test_duplicate_generate_does_not_duplicate_suggestion(db_session, tmp_path) -> None:
     admin = make_user(db_session, "metadata-duplicate-admin")
     kb = make_kb(db_session, admin)
@@ -112,6 +137,44 @@ def test_duplicate_generate_does_not_duplicate_suggestion(db_session, tmp_path) 
         suggested_value="A200",
     ).all()
     assert len(rows) == 1
+
+
+def test_accept_manual_fallback_override_requires_custom_value(db_session, tmp_path, monkeypatch) -> None:
+    admin = make_user(db_session, "metadata-custom-guardrail-admin")
+    kb = make_kb(db_session, admin)
+    document = make_document(db_session, kb, tmp_path, meta={"owner_note": "preserve"})
+    monkeypatch.setattr(document_routes, "enqueue_reindex_job", lambda job_id: None)
+    suggestion = DocumentMetadataSuggestion(
+        document_id=document.id,
+        field="category",
+        raw_value="maintenance",
+        normalized_value="maintenance",
+        normalization_source="fallback",
+        suggested_value="maintenance",
+        confidence=DocumentMetadataSuggestionConfidence.high,
+        source=DocumentMetadataSuggestionSource.filename,
+        evidence_excerpt="maintenance",
+        rule_name="test_rule",
+        status=DocumentMetadataSuggestionStatus.pending,
+    )
+    db_session.add(suggestion)
+    db_session.commit()
+    db_session.refresh(suggestion)
+
+    with pytest.raises(HTTPException) as exc:
+        accept_metadata_suggestion(
+            document.id,
+            suggestion.id,
+            DocumentMetadataSuggestionAcceptRequest(value="Plant custom model"),
+            admin,
+            db_session,
+        )
+    db_session.refresh(document)
+
+    assert exc.value.status_code == 400
+    assert "custom_value=true" in exc.value.detail
+    assert document.meta == {"owner_note": "preserve"}
+    assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 0
 
 
 def test_accept_updates_document_metadata_and_creates_index_job(db_session, tmp_path, monkeypatch) -> None:
@@ -133,6 +196,45 @@ def test_accept_updates_document_metadata_and_creates_index_job(db_session, tmp_
 
     assert accepted["status"] == "accepted"
     assert document.meta["equipment_model"] == "A200"
+    assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 1
+
+
+def test_accept_manual_fallback_override_with_custom_value_is_explicit(db_session, tmp_path, monkeypatch) -> None:
+    admin = make_user(db_session, "metadata-custom-accept-admin")
+    kb = make_kb(db_session, admin)
+    document = make_document(db_session, kb, tmp_path)
+    monkeypatch.setattr(document_routes, "enqueue_reindex_job", lambda job_id: None)
+    suggestion = DocumentMetadataSuggestion(
+        document_id=document.id,
+        field="category",
+        raw_value="maintenance",
+        normalized_value="maintenance",
+        normalization_source="fallback",
+        suggested_value="maintenance",
+        confidence=DocumentMetadataSuggestionConfidence.high,
+        source=DocumentMetadataSuggestionSource.filename,
+        evidence_excerpt="maintenance",
+        rule_name="test_rule",
+        status=DocumentMetadataSuggestionStatus.pending,
+    )
+    db_session.add(suggestion)
+    db_session.commit()
+    db_session.refresh(suggestion)
+
+    accepted = accept_metadata_suggestion(
+        document.id,
+        suggestion.id,
+        DocumentMetadataSuggestionAcceptRequest(value="Plant custom model", custom_value=True),
+        admin,
+        db_session,
+    )
+    db_session.refresh(document)
+    suggestion = db_session.get(DocumentMetadataSuggestion, suggestion.id)
+
+    assert accepted["status"] == "accepted"
+    assert accepted["custom_value"] is True
+    assert suggestion.custom_value is True
+    assert document.meta["category"] == "Plant custom model"
     assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 1
 
 

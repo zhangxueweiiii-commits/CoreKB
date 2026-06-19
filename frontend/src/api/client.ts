@@ -61,6 +61,14 @@ export interface DocumentMetadataSuggestion {
   reviewed_at?: string | null;
   created_at: string;
   current_value?: string | null;
+  review_guardrails?: {
+    requires_evidence_review: boolean;
+    requires_current_value_review: boolean;
+    requires_custom_value_flag: boolean;
+    reindex_required_on_accept: boolean;
+    warnings: string[];
+    checklist: string[];
+  };
 }
 
 export interface DocumentMetadataSuggestionList {
