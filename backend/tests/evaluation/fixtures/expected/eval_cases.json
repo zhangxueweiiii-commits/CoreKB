@@ -1,0 +1,67 @@
+[
+  {
+    "id": "maintenance_001",
+    "category": "maintenance",
+    "assistant_type": "maintenance",
+    "query": "A200 设备报 E12 怎么处理？",
+    "expected_document": "A200维修手册",
+    "expected_keywords": ["E12", "温度传感器", "检查接线"],
+    "expected_metadata": {
+      "equipment_model": "A200",
+      "fault_code": "E12"
+    },
+    "expected_answer_type": "troubleshooting_steps",
+    "should_have_answer": true
+  },
+  {
+    "id": "quality_001",
+    "category": "quality",
+    "assistant_type": "quality",
+    "query": "外观划伤超过 3mm 怎么处理？",
+    "expected_document": "质量检验标准",
+    "expected_keywords": ["外观划伤", "3mm", "隔离"],
+    "expected_metadata": {
+      "quality_item": "外观划伤"
+    },
+    "expected_answer_type": "quality_judgement",
+    "should_have_answer": true
+  },
+  {
+    "id": "sop_001",
+    "category": "sop",
+    "assistant_type": "sop",
+    "query": "A200 控制板装配端子扭矩是多少？",
+    "expected_document": "装配SOP",
+    "expected_keywords": ["端子扭矩", "0.5 N·m", "防静电"],
+    "expected_metadata": {
+      "process_name": "A200 控制板装配"
+    },
+    "expected_answer_type": "sop_steps",
+    "should_have_answer": true
+  },
+  {
+    "id": "material_001",
+    "category": "material",
+    "assistant_type": "material",
+    "query": "P-A200-H 的通信协议和替代料是什么？",
+    "expected_document": "物料参数表",
+    "expected_keywords": ["P-A200-H", "EtherCAT", "P-A200-S"],
+    "expected_metadata": {
+      "material_code": "P-A200-H",
+      "product_model": "A200-H"
+    },
+    "expected_answer_type": "parameter_lookup",
+    "should_have_answer": true
+  },
+  {
+    "id": "no_answer_001",
+    "category": "maintenance",
+    "assistant_type": "maintenance",
+    "query": "Z900 设备报 F99 如何修复？",
+    "expected_document": null,
+    "expected_keywords": [],
+    "expected_metadata": {},
+    "expected_answer_type": "no_answer",
+    "should_have_answer": false
+  }
+]

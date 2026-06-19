@@ -1,0 +1,30 @@
+[
+  {
+    "field_name": "equipment_model",
+    "canonical_value": "A200",
+    "aliases": ["A-200", "EQ-A200"],
+    "status": "active",
+    "description": "Example equipment model dictionary entry"
+  },
+  {
+    "field_name": "fault_code",
+    "canonical_value": "E12",
+    "aliases": ["E-12", "ERR12", "Error 12"],
+    "status": "active",
+    "description": "Example fault code dictionary entry"
+  },
+  {
+    "field_name": "sop_code",
+    "canonical_value": "SOP-001",
+    "aliases": ["SOP001", "SOP 001"],
+    "status": "active",
+    "description": "Example SOP code dictionary entry"
+  },
+  {
+    "field_name": "material_code",
+    "canonical_value": "MAT-001",
+    "aliases": ["MAT001", "MAT 001"],
+    "status": "active",
+    "description": "Example material code dictionary entry"
+  }
+]
