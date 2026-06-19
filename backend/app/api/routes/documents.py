@@ -15,6 +15,7 @@ from app.schemas.document import (
     DocumentMetadataSuggestionListResponse,
     DocumentMetadataSuggestionRead,
     DocumentRead,
+    ValidationReportSuggestionBridgeResponse,
 )
 from app.schemas.index_job import IndexJobSummary
 from app.schemas.validation_report import ValidationReportRead
@@ -29,6 +30,7 @@ from app.services.validation_report_service import (
     get_validation_report as get_validation_report_by_id,
     list_validation_reports_by_document,
 )
+from app.services.validation_report_suggestion_bridge import ValidationReportSuggestionBridge
 from app.services.vector_store import VectorStore
 from app.tasks.document_tasks import enqueue_reindex_job
 
@@ -274,6 +276,52 @@ def get_validation_report(
     document = _get_document_or_404(db, report.document_id)
     _assert_can_view_document(db, current_user, document)
     return _validation_report_read(report)
+
+
+@router.post(
+    "/validation-reports/{report_id}/metadata-suggestions",
+    response_model=ValidationReportSuggestionBridgeResponse,
+)
+def create_metadata_suggestions_from_validation_report(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_validation_report_by_id(db, report_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Validation report not found")
+    document = _get_document_or_404(db, report.document_id)
+    _assert_can_edit_document(db, current_user, document)
+    try:
+        result = ValidationReportSuggestionBridge(db).create_pending_suggestions(report=report, document=document)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    AuditService(db).record(
+        actor=current_user,
+        action="validation_report.metadata_suggestions.generate",
+        resource_type="validation_report",
+        resource_id=report.id,
+        knowledge_base_id=document.knowledge_base_id,
+        document_id=document.id,
+        status="success",
+        metadata={
+            "created_count": len(result.created),
+            "existing_count": len(result.existing),
+            "skipped_count": len(result.skipped),
+        },
+    )
+    return {
+        "report_id": report.id,
+        "document_id": document.id,
+        "created_count": len(result.created),
+        "existing_count": len(result.existing),
+        "skipped_count": len(result.skipped),
+        "items": [_suggestion_read(suggestion, document) for suggestion in result.items],
+        "skipped_issues": [
+            {"field": skipped.field, "code": skipped.code, "reason": skipped.reason}
+            for skipped in result.skipped
+        ],
+    }
 
 
 @router.get("/documents/{document_id}/validation-reports", response_model=list[ValidationReportRead])

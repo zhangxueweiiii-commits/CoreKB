@@ -139,3 +139,33 @@ The API does not:
 - Change ingestion, embedding, retrieval, or chat behavior.
 
 Missing report ids return `404`. A document with no validation reports returns an empty list.
+
+## Validation Report to Pending Suggestion Bridge
+
+Validation reports can now be used as a source for pending metadata suggestions:
+
+```http
+POST /api/validation-reports/{report_id}/metadata-suggestions
+```
+
+This bridge is intentionally narrow:
+
+- It reads persisted `issues_json` from an existing metadata validation report.
+- It creates `document_metadata_suggestions` with `status=pending` only.
+- It keeps the source validation report id in the suggestion evidence excerpt.
+- It deduplicates against existing suggestions for the same document, field, and suggested value.
+- It skips unsupported fields and issues without a safe current value.
+
+The bridge does not:
+
+- Modify `documents.metadata`.
+- Accept or reject metadata suggestions.
+- Trigger indexing or reindexing.
+- Parse source files.
+- Read Qdrant payloads.
+- Call an LLM.
+- Store full source document content in suggestions or audit metadata.
+
+Administrators or editors must still review each pending suggestion and explicitly accept or reject it through the normal metadata suggestion review API. Only acceptance writes formal metadata and submits a reindex job.
+
+Supported field mapping is conservative. The first bridge version supports the normal CoreKB metadata suggestion fields and maps generic validation `document_type` to CoreKB `doc_type`.

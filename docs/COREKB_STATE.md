@@ -447,7 +447,7 @@ Strengthen audit guarantees for production-impacting actions:
 
 ### Phase 4: Validation-Report-to-Suggestion Bridge
 
-Build a bridge only after guardrails are in place:
+The first bridge is now available as a reviewed suggestion creation path:
 
 - read validation reports
 - generate candidate suggestions from report issues
@@ -455,6 +455,18 @@ Build a bridge only after guardrails are in place:
 - never auto-accept suggestions
 - keep source report ids for traceability
 - require reviewer action before any metadata write
+
+Current API:
+
+- `POST /api/validation-reports/{report_id}/metadata-suggestions`
+
+Current boundaries:
+
+- unsupported fields and issues without a safe current value are skipped
+- repeated bridge runs deduplicate existing suggestions
+- the bridge does not modify `documents.metadata`
+- the bridge does not trigger indexing or reindexing
+- acceptance remains a separate explicit review action
 
 ### Phase 5: Eval Runner
 
