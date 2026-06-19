@@ -353,7 +353,14 @@ def accept_metadata_suggestion(
         knowledge_base_id=document.knowledge_base_id,
         document_id=document.id,
         status="success",
-        metadata={"field": suggestion.field, "value": suggestion.suggested_value, "index_job_id": str(job.id)},
+        metadata={
+            "field": suggestion.field,
+            "value": suggestion.suggested_value,
+            "suggestion_id": str(suggestion.id),
+            "index_job_id": str(job.id),
+            "reindex_triggered": True,
+            "custom_value": suggestion.custom_value,
+        },
     )
     return _suggestion_read(suggestion, document)
 
@@ -382,7 +389,11 @@ def reject_metadata_suggestion(
         knowledge_base_id=document.knowledge_base_id,
         document_id=document.id,
         status="success",
-        metadata={"field": suggestion.field},
+        metadata={
+            "field": suggestion.field,
+            "suggestion_id": str(suggestion.id),
+            "rejected_status": suggestion.status.value,
+        },
     )
     return _suggestion_read(suggestion, document)
 

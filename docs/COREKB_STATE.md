@@ -340,7 +340,7 @@ The metadata suggestion routes record audit events for:
 - suggestion acceptance
 - suggestion rejection
 
-Acceptance audit metadata includes the accepted field, value, and index job id.
+Acceptance audit metadata includes the accepted field, accepted safe value, suggestion id, index job id, whether reindexing was triggered, and whether a custom value was used. Reject audit metadata includes the field, suggestion id, and rejected suggestion status. Generate audit metadata stores suggestion count only; the target document id is recorded on the audit log record itself.
 
 ### Risks and Boundaries
 
@@ -440,10 +440,10 @@ Add review constraints before any broader suggestion workflow:
 
 Strengthen audit guarantees for production-impacting actions:
 
-- ensure metadata accept/reject/generate actions include request id where available
-- ensure audit payloads contain field names and redacted values only where needed
-- ensure no API keys, passwords, or full source document text enter audit metadata
-- add tests for audit record creation and redaction boundaries
+- keep metadata accept/reject/generate actions covered by tests for request traceability and safe metadata boundaries
+- ensure audit payloads contain field names, suggestion ids, index job ids, reindex markers, custom value markers, and redacted values only where needed
+- ensure no API keys, passwords, tokens, secrets, evidence excerpts, parsed text, file content, or full source document text enter audit metadata
+- keep tests for audit record creation and redaction boundaries current as metadata review evolves
 
 ### Phase 4: Validation-Report-to-Suggestion Bridge
 

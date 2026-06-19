@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from uuid import UUID
 
@@ -10,20 +11,28 @@ from app.models.user import User
 
 
 SENSITIVE_KEYS = {"password", "api_key", "secret", "token", "authorization", "file_content", "content"}
+MAX_AUDIT_STRING_LENGTH = 500
 
 
 def _sanitize_metadata(metadata: dict | None) -> dict:
     if not metadata:
         return {}
-    sanitized: dict = {}
-    for key, value in metadata.items():
-        if key.lower() in SENSITIVE_KEYS:
-            sanitized[key] = "[redacted]"
-        elif isinstance(value, str) and len(value) > 500:
-            sanitized[key] = value[:500]
-        else:
-            sanitized[key] = value
-    return sanitized
+    return {
+        str(key): _sanitize_value(str(key), value)
+        for key, value in metadata.items()
+    }
+
+
+def _sanitize_value(key: str, value):
+    if key.lower() in SENSITIVE_KEYS:
+        return "[redacted]"
+    if isinstance(value, str):
+        return value[:MAX_AUDIT_STRING_LENGTH]
+    if isinstance(value, Mapping):
+        return {str(child_key): _sanitize_value(str(child_key), child_value) for child_key, child_value in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_sanitize_value("", item) for item in value]
+    return value
 
 
 class AuditService:

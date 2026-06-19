@@ -13,6 +13,7 @@ from app.api.routes import chat as chat_routes
 from app.api.routes import documents as document_routes
 from app.api.routes import kb as kb_routes
 from app.api.routes import search as search_routes
+from app.core.request_context import RequestContext, set_request_context
 from app.core.security import get_password_hash
 from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
@@ -65,6 +66,58 @@ def test_audit_service_redacts_sensitive_metadata(db_session) -> None:
     assert log.meta["password"] == "[redacted]"
     assert log.meta["api_key"] == "[redacted]"
     assert log.meta["note"] == "ok"
+
+
+def test_audit_service_recursively_redacts_and_truncates_metadata(db_session) -> None:
+    admin = make_user(db_session, "admin-recursive", UserRole.admin)
+    long_note = "x" * 600
+
+    log = AuditService(db_session).record(
+        actor=admin,
+        action="audit.test",
+        resource_type="audit",
+        resource_id=admin.id,
+        metadata={
+            "nested": {
+                "token": "secret-token",
+                "note": long_note,
+                "items": [{"api_key": "sk-test", "safe": "ok"}],
+            },
+            "content": "full source document text",
+        },
+    )
+
+    assert log.meta["content"] == "[redacted]"
+    assert log.meta["nested"]["token"] == "[redacted]"
+    assert log.meta["nested"]["items"][0]["api_key"] == "[redacted]"
+    assert log.meta["nested"]["items"][0]["safe"] == "ok"
+    assert len(log.meta["nested"]["note"]) == 500
+
+
+def test_audit_service_records_request_context_without_sensitive_metadata(db_session) -> None:
+    admin = make_user(db_session, "admin-context", UserRole.admin)
+    set_request_context(
+        RequestContext(
+            request_id="audit-request-123",
+            ip_address="127.0.0.1",
+            user_agent="pytest-agent",
+        )
+    )
+
+    try:
+        log = AuditService(db_session).record(
+            actor=admin,
+            action="audit.context",
+            resource_type="audit",
+            metadata={"password": "secret"},
+        )
+    finally:
+        set_request_context(RequestContext())
+
+    assert log.request_id == "audit-request-123"
+    assert log.ip_address == "127.0.0.1"
+    assert log.user_agent == "pytest-agent"
+    assert log.meta["password"] == "[redacted]"
 
 
 def test_successful_login_writes_audit_log(db_session) -> None:

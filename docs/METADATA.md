@@ -167,6 +167,33 @@ GET /api/documents/metadata-suggestions?status=pending&field=equipment_model&kno
 
 CoreKB copies document metadata into chunk metadata during indexing and then writes the same metadata into Qdrant payloads. If a metadata value is accepted but the document is not reindexed, metadata filters would still search stale Qdrant payloads.
 
+## Metadata Suggestion Audit Logs
+
+CoreKB records audit logs for metadata suggestion generation, acceptance, and rejection.
+
+Generation audit metadata stores only:
+
+- `suggestion_count`
+
+The target document is recorded through the audit log `document_id` field, so it is not duplicated in metadata.
+
+Acceptance audit metadata stores traceability fields:
+
+- `field`
+- `value`
+- `suggestion_id`
+- `index_job_id`
+- `reindex_triggered`
+- `custom_value`
+
+Reject audit metadata stores:
+
+- `field`
+- `suggestion_id`
+- `rejected_status`
+
+Audit metadata must not store full source document content, parsed text, file content, evidence excerpts, API keys, passwords, tokens, or secrets. Sensitive metadata keys are redacted before audit records are persisted.
+
 ## Current Limits
 
 - No LLM extraction.

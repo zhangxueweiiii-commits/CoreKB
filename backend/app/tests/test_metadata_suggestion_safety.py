@@ -10,6 +10,7 @@ from app.api.routes.documents import (
     generate_metadata_suggestions,
     reject_metadata_suggestion,
 )
+from app.core.request_context import RequestContext, set_request_context
 from app.models.audit_log import AuditLog
 from app.models.document import (
     Document,
@@ -142,7 +143,11 @@ def test_reject_suggestion_does_not_modify_metadata_or_enqueue_reindex(db_sessio
     assert calls == []
     assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 0
     audit = db_session.query(AuditLog).filter_by(action="document.metadata_suggestion.reject").one()
-    assert audit.meta == {"field": "equipment_model"}
+    assert audit.meta == {
+        "field": "equipment_model",
+        "suggestion_id": str(suggestion_id),
+        "rejected_status": "rejected",
+    }
 
 
 def test_accept_suggestion_writes_only_target_field_and_enqueues_single_reindex(db_session, tmp_path, monkeypatch) -> None:
@@ -195,10 +200,53 @@ def test_accept_suggestion_audit_log_is_traceable_without_full_source_content(db
     assert audit.document_id == document.id
     assert audit.meta["field"] == "equipment_model"
     assert audit.meta["value"] == "A200"
+    assert audit.meta["suggestion_id"] == str(suggestion_id)
     assert audit.meta["index_job_id"]
+    assert audit.meta["reindex_triggered"] is True
+    assert audit.meta["custom_value"] is False
     assert "content" not in audit.meta
     assert "file_content" not in audit.meta
     assert "evidence_excerpt" not in audit.meta
+
+
+def test_metadata_suggestion_audit_log_preserves_request_id_and_redaction_boundary(db_session, tmp_path, monkeypatch) -> None:
+    admin = make_user(db_session, "metadata-safety-request-id-admin")
+    kb = make_kb(db_session, admin)
+    document = make_document(db_session, kb, tmp_path)
+    monkeypatch.setattr(document_routes, "enqueue_reindex_job", lambda job_id: None)
+    set_request_context(
+        RequestContext(
+            request_id="metadata-review-request-123",
+            ip_address="10.0.0.8",
+            user_agent="pytest-reviewer",
+        )
+    )
+
+    try:
+        generate_metadata_suggestions(document.id, admin, db_session)
+        suggestion_id = first_suggestion_id(db_session, document)
+        accept_metadata_suggestion(
+            document.id,
+            suggestion_id,
+            DocumentMetadataSuggestionAcceptRequest(value="A-200"),
+            admin,
+            db_session,
+        )
+    finally:
+        set_request_context(RequestContext())
+
+    audits = db_session.query(AuditLog).order_by(AuditLog.created_at.asc()).all()
+    assert [audit.action for audit in audits] == [
+        "document.metadata_suggestions.generate",
+        "document.metadata_suggestion.accept",
+    ]
+    for audit in audits:
+        assert audit.request_id == "metadata-review-request-123"
+        assert audit.ip_address == "10.0.0.8"
+        assert audit.user_agent == "pytest-reviewer"
+        assert "content" not in audit.meta
+        assert "file_content" not in audit.meta
+        assert "evidence_excerpt" not in audit.meta
 
 
 def test_unsupported_suggestion_field_cannot_be_accepted_or_mutate_state(db_session, tmp_path, monkeypatch) -> None:
@@ -236,6 +284,7 @@ def test_unsupported_suggestion_field_cannot_be_accepted_or_mutate_state(db_sess
     assert unsupported.status == DocumentMetadataSuggestionStatus.pending
     assert calls == []
     assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 0
+    assert db_session.query(AuditLog).filter_by(action="document.metadata_suggestion.accept").count() == 0
 
 
 def test_viewer_cannot_generate_metadata_suggestions(db_session, tmp_path) -> None:
@@ -251,4 +300,21 @@ def test_viewer_cannot_generate_metadata_suggestions(db_session, tmp_path) -> No
     assert exc.value.status_code == 403
     assert db_session.query(DocumentMetadataSuggestion).filter_by(document_id=document.id).count() == 0
     assert db_session.query(IndexJob).filter_by(document_id=document.id).count() == 0
+    assert db_session.query(AuditLog).filter_by(action="document.metadata_suggestions.generate").count() == 0
+
+
+def test_viewer_cannot_accept_metadata_suggestion_without_success_audit(db_session, tmp_path) -> None:
+    admin = make_user(db_session, "metadata-safety-accept-permission-admin")
+    viewer = make_user(db_session, "metadata-safety-accept-viewer", UserRole.viewer)
+    kb = make_kb(db_session, admin)
+    grant(db_session, kb, viewer, KBPermissionRole.viewer)
+    document = make_document(db_session, kb, tmp_path)
+    generate_metadata_suggestions(document.id, admin, db_session)
+    suggestion_id = first_suggestion_id(db_session, document)
+
+    with pytest.raises(HTTPException) as exc:
+        accept_metadata_suggestion(document.id, suggestion_id, None, viewer, db_session)
+
+    assert exc.value.status_code == 403
+    assert db_session.query(AuditLog).filter_by(action="document.metadata_suggestion.accept").count() == 0
 
