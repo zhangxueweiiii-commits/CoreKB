@@ -169,3 +169,26 @@ The bridge does not:
 Administrators or editors must still review each pending suggestion and explicitly accept or reject it through the normal metadata suggestion review API. Only acceptance writes formal metadata and submits a reindex job.
 
 Supported field mapping is conservative. The first bridge version supports the normal CoreKB metadata suggestion fields and maps generic validation `document_type` to CoreKB `doc_type`.
+## Validation Report Review UI
+
+The document detail view shows validation reports for the selected document. Reviewers can inspect:
+
+- report type
+- severity
+- status
+- summary
+- issue count
+- individual issue fields, codes, current values, expected values, and messages
+
+Admins and editors can click `Create pending suggestions` on a report. This calls the validation-report bridge and displays how many pending suggestions were created, how many already existed, and how many issues were skipped.
+
+The review UI does not:
+
+- accept suggestions automatically
+- modify `documents.metadata`
+- trigger reindexing
+- create validation reports
+- parse files
+- call an LLM
+
+It is a human review surface for existing diagnostics and pending suggestion creation only. Formal metadata changes still require explicit acceptance through the metadata suggestion review controls.

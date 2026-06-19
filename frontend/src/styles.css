@@ -233,6 +233,31 @@ td {
   color: #9b1c13;
 }
 
+.status-info {
+  background: #e7f0ff;
+  color: #214b83;
+}
+
+.status-warning {
+  background: #fff4d6;
+  color: #7a4b00;
+}
+
+.status-error {
+  background: #fde2df;
+  color: #9b1c13;
+}
+
+.nested-table {
+  margin-top: 10px;
+}
+
+.nested-table th,
+.nested-table td {
+  font-size: 13px;
+  padding: 8px;
+}
+
 .search-results {
   display: grid;
   gap: 6px;
