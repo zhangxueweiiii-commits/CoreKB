@@ -33,8 +33,8 @@ Metadata suggestion responses now include a `review_guardrails` object with revi
 
 Passed.
 
-- Metadata suggestion tests: `12 passed`
-- Canonical backend tests: `268 passed, 1 skipped`
+- Metadata suggestion focused tests: `19 passed`
+- Canonical backend tests: `275 passed, 1 skipped`
 - Frontend build: passed after `npm ci`
 - Agent result checker and agent runner checks passed
 
