@@ -34,6 +34,10 @@ Suggestions never overwrite formal document metadata automatically. Existing for
 Each suggestion contains:
 
 - `field`
+- `raw_value`
+- `normalized_value`
+- `normalization_source`
+- `dictionary_entry_id`
 - `suggested_value`
 - `confidence`: `high`, `medium`, `low`
 - `source`: `filename`, `title`, `parsed_text`
@@ -43,6 +47,8 @@ Each suggestion contains:
 - `reviewed_by`
 - `reviewed_at`
 - `created_at`
+- `current_value`
+- `review_guardrails`
 
 The uniqueness rule is:
 
@@ -51,6 +57,27 @@ document_id + field + suggested_value
 ```
 
 Repeated generation does not create duplicate suggestions.
+
+## Review Guardrails
+
+Metadata suggestions are advisory until an admin or editor explicitly accepts one. The API returns a `review_guardrails` object for each suggestion so review UIs can show the same safety context consistently.
+
+Current guardrail fields:
+
+- `requires_evidence_review`: reviewers should inspect `evidence_excerpt` before accepting.
+- `requires_current_value_review`: the target field already has a formal value in `documents.metadata`.
+- `requires_custom_value_flag`: the value came from fallback normalization, so non-standard manual overrides must use `custom_value=true`.
+- `reindex_required_on_accept`: accepting writes document metadata and submits a single-document reindex.
+- `warnings`: human-readable review warnings.
+- `checklist`: stable review checklist items.
+
+Accepting a manual override that cannot be matched by dictionary or rule normalization now requires:
+
+```json
+{"value": "Plant custom value", "custom_value": true}
+```
+
+This keeps custom values explicit and prevents accidental fallback values from being treated as standard metadata. Generated fallback suggestions can still be accepted as-is, but reviewer UIs should display the fallback warning.
 
 ## Rule-Based Extraction
 
@@ -113,6 +140,15 @@ POST /api/documents/{document_id}/metadata-suggestions/{suggestion_id}/accept
 Content-Type: application/json
 
 {"value": "A200"}
+```
+
+Keep a custom non-standard value:
+
+```http
+POST /api/documents/{document_id}/metadata-suggestions/{suggestion_id}/accept
+Content-Type: application/json
+
+{"value": "Plant custom A200", "custom_value": true}
 ```
 
 Reject:
