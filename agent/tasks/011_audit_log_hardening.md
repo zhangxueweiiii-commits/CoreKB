@@ -1,18 +1,20 @@
-# Task 011: Audit Log Hardening
+# Task 011: Audit Log Hardening for Metadata Suggestion Review
 
 ## Goal
 
-Harden CoreKB audit logging around controlled self-evolution and metadata suggestion review.
+Harden audit logging around metadata suggestion generate, accept, and reject so production-impacting metadata review actions are traceable and safe.
 
 ## Scope
 
-Small backend service/test documentation changes only.
+Backend tests, minimal backend audit metadata changes, and documentation only.
 
 Allowed paths:
 
-- `backend/app/services/`
+- `backend/app/api/routes/documents.py`
+- `backend/app/services/audit_service.py`
 - `backend/app/tests/`
-- `docs/`
+- `docs/METADATA.md`
+- `docs/COREKB_STATE.md`
 - `agent/tasks/`
 - `agent/results/`
 
@@ -23,15 +25,21 @@ Do not modify:
 - ingestion, indexing, retrieval, or embedding pipelines
 - frontend
 - production config
+- authentication model
+- permission model
+- unrelated APIs
 - dependencies
 
 ## Requirements
 
-- Recursively redact sensitive audit metadata, including nested dictionaries and lists.
-- Keep audit metadata string values bounded.
-- Preserve request context fields such as `request_id`, IP address, and user agent when available.
-- Strengthen tests for metadata suggestion audit logs so generate/accept actions remain traceable and do not store full source content.
-- Document audit log redaction boundaries.
+- Metadata suggestion generate audit must remain present.
+- Metadata suggestion accept audit must remain present.
+- Metadata suggestion reject audit must remain present.
+- Accept audit metadata must include `field`, accepted safe `value`, `suggestion_id`, `index_job_id`, `reindex_triggered`, and `custom_value`.
+- Reject audit metadata must include `field`, `suggestion_id`, and `rejected_status`.
+- Generate audit metadata must include `suggestion_count`; the document id must be present through audit log fields, not duplicated unnecessarily in metadata.
+- Audit metadata must not include full source document content, parsed text, file content, evidence excerpts, API keys, passwords, tokens, or secrets.
+- If current behavior already satisfies a requirement, add tests instead of changing runtime code.
 
 ## Non-Goals
 
@@ -52,4 +60,3 @@ python scripts/check_agent_result.py agent/results/011_result.md
 python scripts/check_agent_result.py "agent/results/*_result.md"
 python agent/runner.py check
 ```
-
