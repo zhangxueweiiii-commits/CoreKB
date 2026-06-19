@@ -59,6 +59,22 @@ class DocumentMetadataSuggestionListResponse(BaseModel):
     total: int
 
 
+class ValidationReportSuggestionSkippedIssue(BaseModel):
+    field: str | None = None
+    code: str | None = None
+    reason: str
+
+
+class ValidationReportSuggestionBridgeResponse(BaseModel):
+    report_id: UUID
+    document_id: UUID
+    created_count: int
+    existing_count: int
+    skipped_count: int
+    items: list[DocumentMetadataSuggestionRead] = Field(default_factory=list)
+    skipped_issues: list[ValidationReportSuggestionSkippedIssue] = Field(default_factory=list)
+
+
 class DocumentChunkRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

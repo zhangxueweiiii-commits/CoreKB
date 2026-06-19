@@ -163,6 +163,14 @@ Global suggestion list:
 GET /api/documents/metadata-suggestions?status=pending&field=equipment_model&knowledge_base_id={kb_id}
 ```
 
+Create pending suggestions from a validation report:
+
+```http
+POST /api/validation-reports/{report_id}/metadata-suggestions
+```
+
+This bridge reads persisted validation report issues and creates pending metadata suggestions for supported fields only. It does not accept suggestions, does not modify `documents.metadata`, and does not trigger reindexing. Reviewers must still inspect and accept or reject each suggestion explicitly.
+
 ## Why Reindex After Accept
 
 CoreKB copies document metadata into chunk metadata during indexing and then writes the same metadata into Qdrant payloads. If a metadata value is accepted but the document is not reindexed, metadata filters would still search stale Qdrant payloads.
