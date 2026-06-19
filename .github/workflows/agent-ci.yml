@@ -30,4 +30,7 @@ jobs:
 
       - name: Run canonical backend tests
         working-directory: backend
+        env:
+          # Keep CI unit tests deterministic even when OpenTelemetry packages are installed.
+          OTEL_SDK_DISABLED: "true"
         run: python -m pytest -q
