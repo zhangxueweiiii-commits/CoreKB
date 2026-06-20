@@ -440,3 +440,14 @@ blockquote {
   margin-bottom: 4px;
   overflow-wrap: anywhere;
 }
+
+.triage-note-editor {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.triage-note-editor textarea {
+  min-height: 72px;
+  resize: vertical;
+}

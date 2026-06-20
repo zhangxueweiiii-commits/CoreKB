@@ -541,6 +541,33 @@ class EvaluationCaseAnnotationListResponse(BaseModel):
     pages: int
 
 
+class EvaluationFailureTriageNotePayload(BaseModel):
+    triage_status: str = "open"
+    note: str | None = Field(default=None, max_length=4000)
+
+
+class EvaluationFailureTriageNoteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    evaluation_case_result_id: UUID
+    triage_status: str
+    note: str | None = None
+    created_by: UUID | None = None
+    updated_by: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EvaluationFailureTriageNoteListItem(EvaluationFailureTriageNoteRead):
+    evaluation_run_id: UUID
+    case_id: str
+    assistant_type: str | None = None
+    query: str
+    failure_reason: str | None = None
+    suggested_fix_type: str | None = None
+    evaluation_run_display_label: str
+
 class AnnotationSummaryBucket(BaseModel):
     key: str
     label: str

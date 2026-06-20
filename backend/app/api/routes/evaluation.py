@@ -20,6 +20,9 @@ from app.schemas.evaluation import (
     EvaluationCaseAnnotationRead,
     EvaluationCaseAnnotationUpdate,
     EvaluationCaseResultRead,
+    EvaluationFailureTriageNoteListItem,
+    EvaluationFailureTriageNotePayload,
+    EvaluationFailureTriageNoteRead,
     EvaluationRunCompareResponse,
     EvaluationRunListItem,
     EvaluationRunMetadataUpdateRequest,
@@ -44,6 +47,7 @@ from app.services.evaluation_annotation_stats_service import EvaluationAnnotatio
 from app.services.evaluation_case_annotation_service import EvaluationCaseAnnotationService
 from app.services.evaluation_improvement_service import EvaluationImprovementService
 from app.services.evaluation_case_drilldown_service import EvaluationCaseDrilldownService
+from app.services.evaluation_failure_triage_note_service import EvaluationFailureTriageNoteService
 from app.services.evaluation_regression_service import EvaluationRegressionService
 from app.services.evaluation_run_compare_service import EvaluationRunCompareService
 from app.services.evaluation_run_metadata_service import EvaluationRunMetadataService
@@ -291,6 +295,73 @@ def list_case_annotations(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+
+@router.get("/triage-notes", response_model=list[EvaluationFailureTriageNoteListItem])
+def list_failure_triage_notes(
+    evaluation_run_id: UUID | None = None,
+    triage_status: str | None = None,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list:
+    try:
+        return EvaluationFailureTriageNoteService(db).list_notes(
+            evaluation_run_id=evaluation_run_id,
+            triage_status=triage_status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/cases/{case_result_id}/triage-note", response_model=EvaluationFailureTriageNoteRead | None)
+def get_failure_triage_note(
+    case_result_id: UUID,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> object | None:
+    try:
+        return EvaluationFailureTriageNoteService(db).get_note(case_result_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/cases/{case_result_id}/triage-note", response_model=EvaluationFailureTriageNoteRead)
+def upsert_failure_triage_note(
+    case_result_id: UUID,
+    payload: EvaluationFailureTriageNotePayload,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> object:
+    try:
+        return EvaluationFailureTriageNoteService(db).upsert_note(
+            case_result_id=case_result_id,
+            user=current_user,
+            triage_status=payload.triage_status,
+            note=payload.note,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/cases/{case_result_id}/triage-note", response_model=EvaluationFailureTriageNoteRead)
+def update_failure_triage_note(
+    case_result_id: UUID,
+    payload: EvaluationFailureTriageNotePayload,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> object:
+    try:
+        return EvaluationFailureTriageNoteService(db).upsert_note(
+            case_result_id=case_result_id,
+            user=current_user,
+            triage_status=payload.triage_status,
+            note=payload.note,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 @router.get("/annotations/summary", response_model=AnnotationSummaryResponse)
 def annotation_summary(

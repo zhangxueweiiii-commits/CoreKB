@@ -13,6 +13,8 @@ export interface EvalCaseResult {
   keyword_match_rate: number;
   metadata_match_rate: number;
   no_answer_correct?: boolean | null;
+  case_result_id?: string | null;
+  used_metadata_filter?: Record<string, unknown>;
   passed: boolean;
   top_results: Array<Record<string, unknown>>;
 }
@@ -77,6 +79,7 @@ export interface AssistantEvaluationCaseResult {
   failure_reason: string;
   failure_detail?: string | null;
   suggested_fix_type: string;
+  case_result_id?: string | null;
 }
 
 export interface AssistantFailedThreshold {
@@ -468,6 +471,29 @@ export interface AnnotationSummary {
   open_priority_items: AnnotationOpenPriorityItem[];
 }
 
+export interface EvaluationFailureTriageNote {
+  id: string;
+  evaluation_case_result_id: string;
+  triage_status: "open" | "reviewing" | "resolved" | "ignored" | string;
+  note?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  evaluation_run_id?: string;
+  case_id?: string;
+  assistant_type?: string | null;
+  query?: string;
+  failure_reason?: string | null;
+  suggested_fix_type?: string | null;
+  evaluation_run_display_label?: string;
+}
+
+export interface EvaluationFailureTriageNotePayload {
+  triage_status: string;
+  note?: string | null;
+}
+
 export interface EvaluationCaseCompareResult {
   case_id: string;
   before_run?: EvaluationRunDisplay | null;
@@ -534,6 +560,20 @@ export const evaluationApi = {
   compareRetrieval: () =>
     request<RetrievalEvaluationCompareResult>("/evaluation/retrieval/compare", { method: "POST" }),
   latestRetrieval: () => request<EvaluationRun | null>("/evaluation/retrieval/latest"),
+  listFailureTriageNotes: (params: { evaluation_run_id?: string; triage_status?: string } = {}) => {
+    const search = new URLSearchParams();
+    if (params.evaluation_run_id) search.set("evaluation_run_id", params.evaluation_run_id);
+    if (params.triage_status) search.set("triage_status", params.triage_status);
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return request<EvaluationFailureTriageNote[]>(`/evaluation/triage-notes${suffix}`);
+  },
+  getFailureTriageNote: (caseResultId: string) =>
+    request<EvaluationFailureTriageNote | null>(`/evaluation/cases/${caseResultId}/triage-note`),
+  upsertFailureTriageNote: (caseResultId: string, payload: EvaluationFailureTriageNotePayload) =>
+    request<EvaluationFailureTriageNote>(`/evaluation/cases/${caseResultId}/triage-note`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   runAssistants: (
     useMetadataFilter = true,
     useRerank = true,

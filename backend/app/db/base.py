@@ -7,6 +7,7 @@ from app.models.evaluation_run import EvaluationCaseResult, EvaluationRun
 from app.models.evaluation_annotation import EvaluationCaseAnnotation
 from app.models.evaluation_improvement import EvaluationImprovementItem, EvaluationImprovementItemCaseResult
 from app.models.evaluation_regression import EvaluationRegression
+from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.models.index_job import IndexJob, IndexJobItem
 from app.models.knowledge_base import KnowledgeBase, KBPermission
 from app.models.metadata_dictionary import MetadataDictionaryEntry
@@ -28,6 +29,7 @@ __all__ = [
     "EvaluationImprovementItem",
     "EvaluationImprovementItemCaseResult",
     "EvaluationRegression",
+    "EvaluationFailureTriageNote",
     "IndexJob",
     "IndexJobItem",
     "KnowledgeBase",
