@@ -8,6 +8,7 @@ import { AuditLogsPage } from "./pages/AuditLogsPage";
 import { BackupsPage } from "./pages/BackupsPage";
 import { AnnotationListPage } from "./pages/AnnotationListPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
+import { EvaluationDashboardPage } from "./pages/EvaluationDashboardPage";
 import { ImprovementItemDetailPage } from "./pages/ImprovementItemDetailPage";
 import { IndexJobDetailPage } from "./pages/IndexJobDetailPage";
 import { IndexJobsPage } from "./pages/IndexJobsPage";
@@ -99,6 +100,7 @@ export function App() {
       )}
       {active === "chat" && <ChatPage />}
       {active === "assistants" && <AssistantsPage />}
+      {active === "evaluationDashboard" && <EvaluationDashboardPage onOpenEvaluation={() => setActive("evaluation")} />}
       {active === "evaluation" && (
         <EvaluationPage
           onOpenAnnotations={(search) => {
