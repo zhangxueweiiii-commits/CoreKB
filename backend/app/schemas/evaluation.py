@@ -546,6 +546,13 @@ class EvaluationFailureTriageNotePayload(BaseModel):
     note: str | None = Field(default=None, max_length=4000)
 
 
+class EvaluationFailureTriageBatchUpdateRequest(BaseModel):
+    evaluation_case_result_ids: list[UUID] = Field(min_length=1, max_length=200)
+    triage_status: str
+    note: str | None = Field(default=None, max_length=4000)
+    note_mode: str = "replace"
+
+
 class EvaluationFailureTriageNoteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

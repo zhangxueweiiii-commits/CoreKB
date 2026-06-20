@@ -451,3 +451,39 @@ blockquote {
   min-height: 72px;
   resize: vertical;
 }
+
+.batch-triage-bar {
+  align-items: end;
+  background: #f8fbfc;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(160px, 1fr) auto auto minmax(130px, 160px) minmax(150px, 180px) minmax(220px, 1.5fr) auto;
+  margin: 12px 0 16px;
+  padding: 12px;
+}
+
+.batch-triage-bar label {
+  display: grid;
+  gap: 6px;
+}
+
+.batch-triage-bar textarea {
+  min-height: 58px;
+}
+
+.checkbox-cell {
+  text-align: center;
+  width: 72px;
+}
+
+.checkbox-cell input {
+  width: auto;
+}
+
+@media (max-width: 1100px) {
+  .batch-triage-bar {
+    grid-template-columns: 1fr;
+  }
+}
