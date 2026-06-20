@@ -212,3 +212,64 @@ Audit metadata must not store full source document content, parsed text, file co
 - No metadata approval workflow.
 - No complex metadata versioning.
 - Batch review and LLM-assisted suggestions can be considered later.
+
+## Excel / CSV Deep Parsing V1
+
+CoreKB supports first-version deep parsing for table documents through `DocumentParser` and `TableParser`.
+
+Supported formats:
+
+- `.csv`
+- `.xlsx`
+- `.xls` when the installed pandas engine can read it
+
+Table parsing produces `ParsedSection` records with readable row-oriented text. Each section repeats table context so retrieval chunks remain understandable without the original file open:
+
+```text
+File: products.csv
+Sheet: CSV
+Rows: 2-3
+Columns: model, voltage, power
+
+Row 2:
+model: A100
+voltage: 220V
+power: 500W
+
+Row 3:
+model: A200
+voltage: 380V
+power: 1200W
+```
+
+Each table section includes metadata:
+
+- `source_type = table`
+- `sheet_name`
+- `row_start`
+- `row_end`
+- `column_names`
+- `table_index`
+- `source_range`
+
+Chunking behavior:
+
+- table sections are kept as table-aware chunks
+- the normal character-overlap chunker does not split table sections again
+- long tables are split by row groups before chunking
+- every row-group section repeats file, sheet, row range, and column headers
+
+Header handling:
+
+- blank headers become `Column N`
+- duplicate headers become stable suffixed names such as `model_2`
+- empty data rows are skipped
+- empty Excel sheets are skipped
+
+Current limits:
+
+- V1 does not infer merged-cell table structure.
+- V1 does not detect multiple independent tables inside one sheet.
+- V1 does not evaluate formulas; it reads values as exposed by pandas/openpyxl.
+- V1 does not create metadata suggestions or modify `documents.metadata`.
+- V1 does not change indexing or retrieval behavior beyond producing cleaner parsed table sections for the existing pipeline.

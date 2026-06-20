@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -59,7 +60,9 @@ class TableParser:
         for index, (sheet_name, frame) in enumerate(sheets.items()):
             if frame.empty:
                 continue
-            tables.append(self._frame_to_table(frame, sheet_name=str(sheet_name), table_index=index, start_row=2))
+            table = self._frame_to_table(frame, sheet_name=str(sheet_name), table_index=index, start_row=2)
+            if table.rows:
+                tables.append(table)
         return tables
 
     def _frame_to_table(
@@ -70,14 +73,14 @@ class TableParser:
         start_row: int,
     ) -> TableParseResult:
         frame = frame.fillna("")
-        headers = [self._clean_header(column, idx) for idx, column in enumerate(frame.columns, start=1)]
+        headers = self._normalize_headers(frame.columns)
         rows: list[TableRow] = []
         for offset, row in enumerate(frame.itertuples(index=False, name=None), start=start_row):
             values = {
                 header: self._clean_value(value)
                 for header, value in zip(headers, row, strict=False)
             }
-            raw_text = "；".join(f"{key}：{value}" for key, value in values.items() if value)
+            raw_text = "; ".join(f"{key}: {value}" for key, value in values.items() if value)
             if raw_text:
                 rows.append(TableRow(row_number=offset, values=values, raw_text=raw_text))
         row_numbers = [row.row_number for row in rows]
@@ -113,18 +116,18 @@ class TableParser:
         row_start = rows[0].row_number
         row_end = rows[-1].row_number
         lines = [
-            f"文件：{filename}",
-            f"Sheet：{table.sheet_name}",
-            f"行范围：{row_start}-{row_end}",
-            "列：" + "、".join(table.headers),
+            f"File: {filename}",
+            f"Sheet: {table.sheet_name}",
+            f"Rows: {row_start}-{row_end}",
+            "Columns: " + ", ".join(table.headers),
             "",
         ]
         for row in rows:
-            lines.append(f"第{row.row_number}行：")
+            lines.append(f"Row {row.row_number}:")
             for header in table.headers:
                 value = row.values.get(header, "")
                 if value:
-                    lines.append(f"{header}：{value}")
+                    lines.append(f"{header}: {value}")
             lines.append("")
         metadata = {
             "source_type": "table",
@@ -146,11 +149,25 @@ class TableParser:
         match = from_path(path).best()
         return match.encoding if match and match.encoding else "utf-8"
 
+    @classmethod
+    def _normalize_headers(cls, columns: Any) -> list[str]:
+        headers: list[str] = []
+        seen: dict[str, int] = {}
+        for index, column in enumerate(columns, start=1):
+            base = cls._clean_header(column, index)
+            pandas_duplicate = re.match(r"^(.+)\.\d+$", base)
+            if pandas_duplicate and pandas_duplicate.group(1) in seen:
+                base = pandas_duplicate.group(1)
+            count = seen.get(base, 0)
+            seen[base] = count + 1
+            headers.append(base if count == 0 else f"{base}_{count + 1}")
+        return headers
+
     @staticmethod
     def _clean_header(value: Any, index: int) -> str:
         text = str(value).strip()
         if not text or text.startswith("Unnamed:"):
-            return f"列{index}"
+            return f"Column {index}"
         return text
 
     @staticmethod
