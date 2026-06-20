@@ -1,4 +1,4 @@
-.PHONY: agent-test agent-run eval eval-smoke
+.PHONY: agent-test agent-run eval eval-smoke eval-real
 
 agent-test:
 	python agent/runner.py check
@@ -12,3 +12,6 @@ eval:
 
 eval-smoke:
 	python scripts/run_retrieval_evaluation_smoke.py --cases backend/tests/evaluation/fixtures/expected/eval_cases.json
+
+eval-real:
+	python scripts/run_real_retrieval_evaluation.py --confirm-persist
