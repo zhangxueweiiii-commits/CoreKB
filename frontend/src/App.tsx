@@ -9,6 +9,7 @@ import { BackupsPage } from "./pages/BackupsPage";
 import { AnnotationListPage } from "./pages/AnnotationListPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
 import { EvaluationDashboardPage } from "./pages/EvaluationDashboardPage";
+import { EvaluationFailureTriagePage } from "./pages/EvaluationFailureTriagePage";
 import { ImprovementItemDetailPage } from "./pages/ImprovementItemDetailPage";
 import { IndexJobDetailPage } from "./pages/IndexJobDetailPage";
 import { IndexJobsPage } from "./pages/IndexJobsPage";
@@ -101,6 +102,16 @@ export function App() {
       {active === "chat" && <ChatPage />}
       {active === "assistants" && <AssistantsPage />}
       {active === "evaluationDashboard" && <EvaluationDashboardPage onOpenEvaluation={() => setActive("evaluation")} />}
+      {active === "evaluationFailureTriage" && (
+        <EvaluationFailureTriagePage
+          onOpenEvaluation={() => setActive("evaluation")}
+          onOpenAnnotations={(search) => {
+            setAnnotationSearch(search);
+            window.history.pushState(null, "", `/evaluation/annotations${search}`);
+            setActive("annotations");
+          }}
+        />
+      )}
       {active === "evaluation" && (
         <EvaluationPage
           onOpenAnnotations={(search) => {
