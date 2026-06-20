@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from app.api.deps import require_admin
 from app.api.routes.evaluation import (
+    batch_update_failure_triage_notes,
     get_evaluation_case_result,
     list_failure_triage_notes,
     upsert_failure_triage_note,
@@ -12,7 +13,7 @@ from app.api.routes.evaluation import (
 from app.models.evaluation_run import EvaluationCaseResult, EvaluationRun, EvaluationType
 from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.models.user import User, UserRole
-from app.schemas.evaluation import EvaluationFailureTriageNotePayload
+from app.schemas.evaluation import EvaluationFailureTriageBatchUpdateRequest, EvaluationFailureTriageNotePayload
 
 
 def make_user(db, username: str, role: UserRole = UserRole.admin) -> User:
@@ -169,3 +170,99 @@ def test_drilldown_includes_failure_triage_note(db_session) -> None:
     assert detail["triage_note"]["id"] == note.id
     assert detail["triage_note"]["triage_status"] == "reviewing"
     assert detail["triage_note"]["note"] == note.note
+
+
+def batch_payload(case_result_ids: list[uuid.UUID], **overrides) -> EvaluationFailureTriageBatchUpdateRequest:
+    data = {
+        "evaluation_case_result_ids": case_result_ids,
+        "triage_status": "reviewing",
+        "note": "Batch triage note.",
+        "note_mode": "replace",
+    }
+    data.update(overrides)
+    return EvaluationFailureTriageBatchUpdateRequest(**data)
+
+
+def test_admin_can_batch_update_failure_triage_notes(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-admin")
+    _, first = make_case_result(db_session, admin, "case_batch_one")
+    _, second = make_case_result(db_session, admin, "case_batch_two")
+
+    notes = batch_update_failure_triage_notes(
+        batch_payload([first.id, second.id], triage_status="reviewing", note="Investigate together."),
+        admin,
+        db_session,
+    )
+
+    assert len(notes) == 2
+    assert {note.evaluation_case_result_id for note in notes} == {first.id, second.id}
+    assert all(note.triage_status.value == "reviewing" for note in notes)
+    assert all(note.note == "Investigate together." for note in notes)
+
+
+def test_batch_update_deduplicates_case_result_ids(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-dedupe-admin")
+    _, case_result = make_case_result(db_session, admin, "case_batch_dedupe")
+
+    notes = batch_update_failure_triage_notes(
+        batch_payload([case_result.id, case_result.id], triage_status="resolved", note="One update."),
+        admin,
+        db_session,
+    )
+
+    rows = db_session.query(EvaluationFailureTriageNote).filter_by(evaluation_case_result_id=case_result.id).all()
+    assert len(notes) == 1
+    assert len(rows) == 1
+    assert rows[0].triage_status.value == "resolved"
+
+
+def test_batch_update_append_mode_preserves_existing_note(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-append-admin")
+    _, case_result = make_case_result(db_session, admin, "case_batch_append")
+    upsert_failure_triage_note(case_result.id, note_payload(note="Initial note."), admin, db_session)
+
+    notes = batch_update_failure_triage_notes(
+        batch_payload([case_result.id], triage_status="reviewing", note="Follow-up note.", note_mode="append"),
+        admin,
+        db_session,
+    )
+
+    assert notes[0].note == "Initial note.\nFollow-up note."
+
+
+def test_batch_update_keep_mode_changes_status_without_changing_note(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-keep-admin")
+    _, case_result = make_case_result(db_session, admin, "case_batch_keep")
+    upsert_failure_triage_note(case_result.id, note_payload(note="Keep this note."), admin, db_session)
+
+    notes = batch_update_failure_triage_notes(
+        batch_payload([case_result.id], triage_status="ignored", note="Do not use this note.", note_mode="keep"),
+        admin,
+        db_session,
+    )
+
+    assert notes[0].triage_status.value == "ignored"
+    assert notes[0].note == "Keep this note."
+
+
+def test_batch_update_invalid_note_mode_returns_bad_request(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-invalid-mode-admin")
+    _, case_result = make_case_result(db_session, admin, "case_batch_invalid_mode")
+
+    with pytest.raises(HTTPException) as exc:
+        batch_update_failure_triage_notes(
+            batch_payload([case_result.id], note_mode="merge"),
+            admin,
+            db_session,
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_batch_update_missing_case_result_returns_not_found(db_session) -> None:
+    admin = make_user(db_session, "triage-batch-missing-admin")
+
+    with pytest.raises(HTTPException) as exc:
+        batch_update_failure_triage_notes(batch_payload([uuid.uuid4()]), admin, db_session)
+
+    assert exc.value.status_code == 404

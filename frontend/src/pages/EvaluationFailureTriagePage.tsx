@@ -158,6 +158,12 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [noteError, setNoteError] = useState("");
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Record<string, boolean>>({});
+  const [batchStatus, setBatchStatus] = useState("reviewing");
+  const [batchNote, setBatchNote] = useState("");
+  const [batchNoteMode, setBatchNoteMode] = useState<"replace" | "append" | "keep">("replace");
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [batchMessage, setBatchMessage] = useState("");
 
   async function load() {
     setLoading(true);
@@ -220,6 +226,16 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
     () => unique(cases.map((item) => item.assistantType || "").filter(Boolean)),
     [cases],
   );
+  const selectableFilteredCaseIds = useMemo(
+    () => filteredCases.map((item) => item.caseResultId).filter((value): value is string => Boolean(value)),
+    [filteredCases],
+  );
+  const selectedIds = useMemo(
+    () => Object.entries(selectedCaseIds)
+      .filter(([, selected]) => selected)
+      .map(([caseResultId]) => caseResultId),
+    [selectedCaseIds],
+  );
 
   const noCitationCount = cases.filter(
     (item) => item.failureReason === "no_citation" || item.citationPresent === false,
@@ -270,6 +286,55 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
       setSavingCaseId(null);
     }
   }
+
+  function toggleSelected(caseResultId: string, selected: boolean) {
+    setSelectedCaseIds((current) => ({ ...current, [caseResultId]: selected }));
+  }
+
+  function selectVisibleCases() {
+    setSelectedCaseIds((current) => ({
+      ...current,
+      ...Object.fromEntries(selectableFilteredCaseIds.map((caseResultId) => [caseResultId, true])),
+    }));
+  }
+
+  function clearSelectedCases() {
+    setSelectedCaseIds({});
+  }
+
+  async function applyBatchUpdate() {
+    if (selectedIds.length === 0) return;
+    setBatchSaving(true);
+    setNoteError("");
+    setBatchMessage("");
+    try {
+      const savedNotes = await evaluationApi.batchUpdateFailureTriageNotes({
+        evaluation_case_result_ids: selectedIds,
+        triage_status: batchStatus,
+        note: batchNoteMode === "keep" ? null : batchNote.trim() || null,
+        note_mode: batchNoteMode,
+      });
+      setNotesByCase((current) => ({
+        ...current,
+        ...Object.fromEntries(savedNotes.map((note) => [note.evaluation_case_result_id, note])),
+      }));
+      setNoteDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          savedNotes.map((note) => [
+            note.evaluation_case_result_id,
+            { triage_status: note.triage_status || "open", note: note.note || "" },
+          ]),
+        ),
+      }));
+      setBatchMessage(`Updated ${savedNotes.length} triage note${savedNotes.length === 1 ? "" : "s"}.`);
+      clearSelectedCases();
+    } catch (err) {
+      setNoteError(err instanceof Error ? err.message : "Failed to batch update triage notes");
+    } finally {
+      setBatchSaving(false);
+    }
+  }
   return (
     <section className="panel">
       <div className="section-heading">
@@ -288,6 +353,7 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
       {loading && <p className="muted">Loading failed cases...</p>}
       {error && <p className="error">{error}</p>}
       {noteError && <p className="error">{noteError}</p>}
+      {batchMessage && <p className="notice">{batchMessage}</p>}
 
       <div className="metric-grid dashboard-cards">
         <div className="dashboard-card">
@@ -364,6 +430,48 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
         </label>
       </div>
 
+      <div className="batch-triage-bar">
+        <div>
+          <strong>{selectedIds.length}</strong> selected
+          <div className="muted">Batch operations update triage notes only.</div>
+        </div>
+        <button type="button" onClick={selectVisibleCases} disabled={selectableFilteredCaseIds.length === 0}>
+          Select visible
+        </button>
+        <button type="button" onClick={clearSelectedCases} disabled={selectedIds.length === 0}>
+          Clear
+        </button>
+        <label>
+          Status
+          <select value={batchStatus} onChange={(event) => setBatchStatus(event.target.value)}>
+            <option value="open">Open</option>
+            <option value="reviewing">Reviewing</option>
+            <option value="resolved">Resolved</option>
+            <option value="ignored">Ignored</option>
+          </select>
+        </label>
+        <label>
+          Note mode
+          <select value={batchNoteMode} onChange={(event) => setBatchNoteMode(event.target.value as "replace" | "append" | "keep")}>
+            <option value="replace">Replace note</option>
+            <option value="append">Append note</option>
+            <option value="keep">Keep note</option>
+          </select>
+        </label>
+        <label className="batch-note-field">
+          Batch note
+          <textarea
+            value={batchNote}
+            onChange={(event) => setBatchNote(event.target.value)}
+            disabled={batchNoteMode === "keep"}
+            placeholder="Optional note for selected cases"
+          />
+        </label>
+        <button type="button" onClick={applyBatchUpdate} disabled={selectedIds.length === 0 || batchSaving}>
+          {batchSaving ? "Applying..." : "Apply to selected"}
+        </button>
+      </div>
+
       {cases.length === 0 && !loading ? (
         <div className="subtle-note">
           No failed cases are available in the latest evaluation runs. Run retrieval or assistant evaluation first.
@@ -374,6 +482,7 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
         <table>
           <thead>
             <tr>
+              <th>Select</th>
               <th>Source</th>
               <th>Case</th>
               <th>Assistant / Category</th>
@@ -389,6 +498,18 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
           <tbody>
             {filteredCases.map((item) => (
               <tr key={`${item.source}-${item.id}`}>
+                <td className="checkbox-cell">
+                  {item.caseResultId ? (
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedCaseIds[item.caseResultId])}
+                      onChange={(event) => toggleSelected(item.caseResultId as string, event.target.checked)}
+                      aria-label={`Select ${item.id}`}
+                    />
+                  ) : (
+                    <span className="muted">-</span>
+                  )}
+                </td>
                 <td>
                   <span className={`status-pill ${statusClass(item.source)}`}>{sourceLabel(item.source)}</span>
                 </td>

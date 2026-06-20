@@ -1417,3 +1417,50 @@ Each note stores:
 - timestamps
 
 These notes are separate from case annotations and improvement items. They do not change `documents.metadata`, prompts, chunking, rerank settings, indexes, source documents, annotations, or improvement items. Use annotations when the team needs structured root-cause review. Use triage notes when the team needs a quick persisted reviewer scratchpad for a failed case.
+
+## Batch failure triage operations
+
+The Evaluation Failure Triage page supports lightweight batch updates for persisted triage notes. Admin users can select multiple failed evaluation case results and apply one triage status update at once.
+
+API:
+
+```http
+POST /api/evaluation/triage-notes/batch
+```
+
+Request body:
+
+```json
+{
+  "evaluation_case_result_ids": ["{case_result_id}"],
+  "triage_status": "reviewing",
+  "note": "Reviewed as the same metadata issue cluster.",
+  "note_mode": "append"
+}
+```
+
+Supported `triage_status` values remain:
+
+- `open`
+- `reviewing`
+- `resolved`
+- `ignored`
+
+Supported `note_mode` values:
+
+- `replace`: replace each selected case note with the submitted note.
+- `append`: append the submitted note to each existing note.
+- `keep`: update status while leaving existing notes unchanged.
+
+The endpoint de-duplicates selected case result ids and validates that every referenced `evaluation_case_result` exists before writing. It updates only `evaluation_failure_triage_notes` records.
+
+Batch triage operations do not:
+
+- create annotations
+- generate improvement items
+- create evaluation runs
+- call Search, Chat, Rerank, embedding, indexing, or LLM APIs
+- modify `documents.metadata`
+- modify prompts, chunking, rerank settings, indexes, source documents, or production data
+
+Use batch triage for fast reviewer bookkeeping. Use case annotations for structured root-cause review, and use improvement items when the team is ready to track concrete remediation work.

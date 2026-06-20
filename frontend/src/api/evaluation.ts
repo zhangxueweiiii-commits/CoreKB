@@ -494,6 +494,13 @@ export interface EvaluationFailureTriageNotePayload {
   note?: string | null;
 }
 
+export interface EvaluationFailureTriageBatchPayload {
+  evaluation_case_result_ids: string[];
+  triage_status: string;
+  note?: string | null;
+  note_mode?: "replace" | "append" | "keep";
+}
+
 export interface EvaluationCaseCompareResult {
   case_id: string;
   before_run?: EvaluationRunDisplay | null;
@@ -571,6 +578,11 @@ export const evaluationApi = {
     request<EvaluationFailureTriageNote | null>(`/evaluation/cases/${caseResultId}/triage-note`),
   upsertFailureTriageNote: (caseResultId: string, payload: EvaluationFailureTriageNotePayload) =>
     request<EvaluationFailureTriageNote>(`/evaluation/cases/${caseResultId}/triage-note`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  batchUpdateFailureTriageNotes: (payload: EvaluationFailureTriageBatchPayload) =>
+    request<EvaluationFailureTriageNote[]>("/evaluation/triage-notes/batch", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

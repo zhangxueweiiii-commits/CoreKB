@@ -10,6 +10,8 @@ from app.services.evaluation_run_metadata_service import format_evaluation_run_d
 
 
 class EvaluationFailureTriageNoteService:
+    NOTE_MODES = {"replace", "append", "keep"}
+
     def __init__(self, db: Session) -> None:
         self.db = db
 
@@ -38,6 +40,57 @@ class EvaluationFailureTriageNoteService:
         self.db.commit()
         self.db.refresh(record)
         return record
+
+    def batch_upsert_notes(
+        self,
+        case_result_ids: list[UUID],
+        user: User,
+        triage_status: str,
+        note: str | None = None,
+        note_mode: str = "replace",
+    ) -> list[EvaluationFailureTriageNote]:
+        if note_mode not in self.NOTE_MODES:
+            raise ValueError("Invalid note_mode")
+        status = FailureTriageStatus(triage_status)
+        unique_case_result_ids = list(dict.fromkeys(case_result_ids))
+        if not unique_case_result_ids:
+            raise ValueError("At least one evaluation case result id is required")
+
+        case_results = self.db.scalars(
+            select(EvaluationCaseResult).where(EvaluationCaseResult.id.in_(unique_case_result_ids))
+        ).all()
+        found_ids = {case_result.id for case_result in case_results}
+        missing_ids = [case_result_id for case_result_id in unique_case_result_ids if case_result_id not in found_ids]
+        if missing_ids:
+            raise KeyError(f"Evaluation case result not found: {missing_ids[0]}")
+
+        existing_notes = {
+            record.evaluation_case_result_id: record
+            for record in self.db.scalars(
+                select(EvaluationFailureTriageNote).where(
+                    EvaluationFailureTriageNote.evaluation_case_result_id.in_(unique_case_result_ids)
+                )
+            ).all()
+        }
+
+        records: list[EvaluationFailureTriageNote] = []
+        for case_result_id in unique_case_result_ids:
+            record = existing_notes.get(case_result_id)
+            if record is None:
+                record = EvaluationFailureTriageNote(
+                    evaluation_case_result_id=case_result_id,
+                    created_by=user.id,
+                )
+                self.db.add(record)
+            record.triage_status = status
+            record.note = self._merge_note(record.note, note, note_mode)
+            record.updated_by = user.id
+            records.append(record)
+
+        self.db.commit()
+        for record in records:
+            self.db.refresh(record)
+        return records
 
     def list_notes(
         self,
@@ -72,6 +125,18 @@ class EvaluationFailureTriageNoteService:
                 EvaluationFailureTriageNote.evaluation_case_result_id == case_result_id
             )
         )
+
+    @staticmethod
+    def _merge_note(existing_note: str | None, incoming_note: str | None, note_mode: str) -> str | None:
+        if note_mode == "keep":
+            return existing_note
+        if note_mode == "append":
+            incoming = (incoming_note or "").strip()
+            if not incoming:
+                return existing_note
+            existing = (existing_note or "").strip()
+            return f"{existing}\n{incoming}" if existing else incoming
+        return incoming_note
 
     @staticmethod
     def _note_payload(note: EvaluationFailureTriageNote) -> dict:

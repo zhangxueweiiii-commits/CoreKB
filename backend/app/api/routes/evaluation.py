@@ -20,6 +20,7 @@ from app.schemas.evaluation import (
     EvaluationCaseAnnotationRead,
     EvaluationCaseAnnotationUpdate,
     EvaluationCaseResultRead,
+    EvaluationFailureTriageBatchUpdateRequest,
     EvaluationFailureTriageNoteListItem,
     EvaluationFailureTriageNotePayload,
     EvaluationFailureTriageNoteRead,
@@ -292,6 +293,26 @@ def list_case_annotations(
             order_by=order_by,
             order_direction=order_direction,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/triage-notes/batch", response_model=list[EvaluationFailureTriageNoteRead])
+def batch_update_failure_triage_notes(
+    payload: EvaluationFailureTriageBatchUpdateRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list:
+    try:
+        return EvaluationFailureTriageNoteService(db).batch_upsert_notes(
+            case_result_ids=payload.evaluation_case_result_ids,
+            user=current_user,
+            triage_status=payload.triage_status,
+            note=payload.note,
+            note_mode=payload.note_mode,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
