@@ -32,13 +32,13 @@ class TableParser:
     target_chunk_size = 1000
 
     def parse(self, path: Path) -> list[ParsedSection]:
-        results = self._parse_tables(path)
+        results = self.parse_tables(path)
         sections: list[ParsedSection] = []
         for table in results:
             sections.extend(self._table_to_sections(path.name, table))
         return sections
 
-    def _parse_tables(self, path: Path) -> list[TableParseResult]:
+    def parse_tables(self, path: Path) -> list[TableParseResult]:
         suffix = path.suffix.lower()
         if suffix == ".csv":
             return [self._parse_csv(path)]

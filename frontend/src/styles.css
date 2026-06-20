@@ -487,3 +487,32 @@ blockquote {
     grid-template-columns: 1fr;
   }
 }
+
+.table-preview-sheet {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.table-preview-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-preview-meta span {
+  color: #63747d;
+  font-size: 13px;
+}
+
+.table-preview-scroll {
+  border: 1px solid #e3e9ed;
+  border-radius: 6px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.table-preview-scroll table {
+  min-width: 640px;
+}

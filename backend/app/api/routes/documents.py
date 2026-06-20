@@ -15,6 +15,7 @@ from app.schemas.document import (
     DocumentMetadataSuggestionListResponse,
     DocumentMetadataSuggestionRead,
     DocumentRead,
+    TablePreviewResponse,
     ValidationReportSuggestionBridgeResponse,
 )
 from app.schemas.index_job import IndexJobSummary
@@ -25,6 +26,7 @@ from app.services.document_metadata_completeness_service import DocumentMetadata
 from app.services.document_metadata_suggester import DocumentMetadataSuggester, SUPPORTED_METADATA_FIELDS
 from app.services.document_ingestion import DocumentIngestionService
 from app.services.document_parser import DocumentParser
+from app.services.table_parser import TableParser
 from app.services.index_job_service import IndexJobService
 from app.services.validation_report_service import (
     get_validation_report as get_validation_report_by_id,
@@ -445,6 +447,51 @@ def reject_metadata_suggestion(
     )
     return _suggestion_read(suggestion, document)
 
+
+
+@router.get("/documents/{document_id}/table-preview", response_model=TablePreviewResponse)
+def get_document_table_preview(
+    document_id: UUID,
+    max_rows: int = Query(default=50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    document = _get_document_or_404(db, document_id)
+    _assert_can_view_document(db, current_user, document)
+    if document.file_type.lower() not in {"csv", "xlsx", "xls"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Document is not a table file")
+    path = Path(document.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stored file not found")
+    try:
+        tables = TableParser().parse_tables(path)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unable to parse table preview: {exc}") from exc
+    return {
+        "document_id": document.id,
+        "filename": document.filename,
+        "file_type": document.file_type,
+        "tables": [
+            {
+                "sheet_name": table.sheet_name,
+                "table_index": table.table_index,
+                "headers": table.headers,
+                "row_count": table.row_count,
+                "column_count": table.column_count,
+                "source_range": table.source_range,
+                "rows": [
+                    {
+                        "row_number": row.row_number,
+                        "values": row.values,
+                        "raw_text": row.raw_text,
+                    }
+                    for row in table.rows[:max_rows]
+                ],
+                "truncated": len(table.rows) > max_rows,
+            }
+            for table in tables
+        ],
+    }
 
 @router.get("/documents/{document_id}", response_model=DocumentRead)
 def get_document(

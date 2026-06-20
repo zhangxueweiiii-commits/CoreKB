@@ -42,6 +42,30 @@ export interface DocumentItem {
   updated_at: string;
 }
 
+
+export interface TablePreviewRow {
+  row_number: number;
+  values: Record<string, string>;
+  raw_text: string;
+}
+
+export interface TablePreviewTable {
+  sheet_name: string;
+  table_index: number;
+  headers: string[];
+  row_count: number;
+  column_count: number;
+  source_range: string;
+  rows: TablePreviewRow[];
+  truncated: boolean;
+}
+
+export interface TablePreviewResponse {
+  document_id: string;
+  filename: string;
+  file_type: string;
+  tables: TablePreviewTable[];
+}
 export interface DocumentMetadataSuggestion {
   id: string;
   document_id: string;
@@ -210,6 +234,8 @@ export const api = {
     request<KnowledgeBase>("/kb", { method: "POST", body: JSON.stringify(payload) }),
   documents: (kbId: string) => request<DocumentItem[]>(`/kb/${kbId}/documents`),
   document: (documentId: string) => request<DocumentItem>(`/documents/${documentId}`),
+  tablePreview: (documentId: string, maxRows = 50) =>
+    request<TablePreviewResponse>(`/documents/${documentId}/table-preview?max_rows=${maxRows}`),
   uploadDocument: (kbId: string, file: File) => {
     const data = new FormData();
     data.append("file", file);
