@@ -81,8 +81,11 @@ If the task scope is unclear, the agent should stop before editing production-im
 
 - `make agent-test`: verifies that the agent workflow files exist.
 - `make eval`: runs a deterministic, read-only evaluation fixture baseline.
+- `make eval-smoke`: runs a deterministic, read-only retrieval evaluation smoke test with fake retrieval.
 
 The current `eval` target validates `backend/tests/evaluation/fixtures/expected/eval_cases.json` and summarizes fixture coverage by category, assistant type, answerability, and expected metadata fields. It does not connect to PostgreSQL, Qdrant, Redis, Celery, rerank providers, or LLMs, and it does not mutate production data.
+
+The `eval-smoke` target exercises `EvaluationService.evaluate_case()` and metric calculation with deterministic fake retrieval. It does not persist evaluation runs or connect to live infrastructure.
 
 A later scoped task can connect the command to live retrieval and assistant evaluation once that execution contract is explicitly reviewed.
 

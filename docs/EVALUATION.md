@@ -1298,3 +1298,23 @@ The command is intentionally read-only. It does not connect to PostgreSQL, Qdran
 A successful baseline means the fixture file is structurally ready for a later live evaluation workflow. It does not prove retrieval quality, answer quality, citation correctness, or rerank effectiveness. Those still require the existing API-backed retrieval and assistant evaluation paths after fixtures have been imported and indexed.
 
 If the baseline exits non-zero, fix duplicate case ids, missing required fields, or unsupported category / assistant type values before running live evaluation.
+
+## Retrieval Evaluation Smoke Test
+
+`make eval-smoke` runs a deterministic smoke test through the existing retrieval evaluation service logic:
+
+```bash
+make eval-smoke
+```
+
+Equivalent direct command:
+
+```bash
+python scripts/run_retrieval_evaluation_smoke.py --cases backend/tests/evaluation/fixtures/expected/eval_cases.json
+```
+
+The smoke runner loads `eval_cases.json`, builds deterministic fake retrieval results for answerable cases, returns no results for no-answer cases, and exercises `EvaluationService.evaluate_case()` plus `calculate_metrics()`. It verifies that Hit@K, MRR, keyword match, metadata match, and no-answer accuracy can be calculated end to end without live infrastructure.
+
+This is still a read-only tooling check. It does not connect to PostgreSQL, Qdrant, Redis, Celery, embedding providers, rerank providers, or LLMs. It does not create `evaluation_runs`, persist `evaluation_case_results`, upload documents, create suggestions, mutate `documents.metadata`, or trigger reindexing.
+
+Use this smoke test after `make eval` passes and before running the heavier API-backed retrieval evaluation. Passing smoke results mean the evaluation code path is structurally healthy with deterministic retrieval, not that production retrieval quality is good.
