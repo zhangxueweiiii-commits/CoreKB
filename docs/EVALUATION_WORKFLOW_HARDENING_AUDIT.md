@@ -268,3 +268,15 @@ This audit does not propose or implement:
 CoreKB's evaluation workflow is currently shaped as a controlled, evidence-preserving review loop. The strongest controls are persisted case snapshots, no-rerun drill-down, PR-only development, run metadata, and clear separation between system judgments, human annotations, improvement items, regressions, and triage notes.
 
 The main hardening priority is preserving advisory boundaries as the workflow grows. Evaluation outputs should continue to inform human review, not directly mutate production metadata, prompts, documents, indexes, or retrieval configuration.
+
+## Boundary Regression Test Coverage
+
+Task 023 adds regression tests under `backend/app/tests/test_evaluation_boundary_regression.py` to make the advisory boundary executable in CI.
+
+Covered boundaries:
+
+- case drill-down reads saved evaluation snapshots without modifying `documents.metadata`, metadata suggestions, index jobs, annotations, improvement items, improvement links, regressions, or triage notes
+- compare-case requests with a missing before/after snapshot return `unavailable` without creating new `evaluation_case_results` or rerunning retrieval/chat logic
+- batch triage operations create or update only `evaluation_failure_triage_notes`, and do not create structured annotations, improvement items, suggestions, index jobs, regressions, or metadata mutations
+
+These tests are intentionally narrow. They do not prove every future evaluation feature is safe, but they create a regression fence around the most important current boundary: evaluation review actions can persist advisory evaluation-domain records, but must not silently mutate production knowledge data or indexing state.
