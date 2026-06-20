@@ -1380,7 +1380,7 @@ The dashboard intentionally uses cards and tables only. It does not add charts, 
 
 ## Evaluation Failure Triage
 
-The Evaluation Failure Triage page is a lightweight, read-only admin view for the latest retrieval and assistant evaluation failures.
+The Evaluation Failure Triage page is a lightweight admin view for the latest retrieval and assistant evaluation failures. It can persist case-level triage notes, but those notes are advisory records only.
 
 It exists to help reviewers quickly group failed cases before opening the full Evaluation workbench. It combines the latest retrieval failed cases and the latest assistant failed cases, then supports simple filters for:
 
@@ -1392,7 +1392,7 @@ It exists to help reviewers quickly group failed cases before opening the full E
 
 The summary cards highlight likely problem clusters such as metadata-related failures, missing citations, no-answer behavior, retrieval failures, and assistant failures. Retrieval failures use conservative UI-side labels derived from existing metrics such as Hit@1, Hit@5, keyword match rate, metadata match rate, and no-answer correctness. Assistant failures use the persisted `failure_reason` and `suggested_fix_type` values returned by the evaluation API.
 
-This page is advisory only. It does not:
+This page is advisory. Persisted triage notes can record reviewer status and notes for an evaluation case result. The page does not:
 
 - create annotations
 - generate improvement items
@@ -1402,3 +1402,18 @@ This page is advisory only. It does not:
 - modify prompts, chunking, rerank settings, indexes, or source documents
 
 Use it as a triage entry point, then open the Evaluation workbench, annotation list, case drill-down, or improvement items for deeper review.
+
+
+## Persisted failure triage notes
+
+Failure triage notes are lightweight records attached to `evaluation_case_results`. They are intended for quick reviewer notes while sorting failed cases in the Failure Triage page.
+
+Each note stores:
+
+- `evaluation_case_result_id`
+- `triage_status`: `open`, `reviewing`, `resolved`, or `ignored`
+- `note`
+- `created_by` and `updated_by`
+- timestamps
+
+These notes are separate from case annotations and improvement items. They do not change `documents.metadata`, prompts, chunking, rerank settings, indexes, source documents, annotations, or improvement items. Use annotations when the team needs structured root-cause review. Use triage notes when the team needs a quick persisted reviewer scratchpad for a failed case.

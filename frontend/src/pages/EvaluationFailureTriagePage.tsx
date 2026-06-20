@@ -5,6 +5,7 @@ import {
   type AssistantEvaluationResult,
   type EvalCaseResult,
   type EvaluationRun,
+  type EvaluationFailureTriageNote,
 } from "../api/evaluation";
 
 interface Props {
@@ -17,6 +18,7 @@ type TriageSource = "retrieval" | "assistant";
 interface TriageCase {
   source: TriageSource;
   id: string;
+  caseResultId?: string | null;
   category: string;
   assistantType?: string | null;
   query: string;
@@ -95,6 +97,7 @@ function normalizeRetrievalCase(item: EvalCaseResult): TriageCase {
   return {
     source: "retrieval",
     id: item.id,
+    caseResultId: item.case_result_id,
     category: item.category,
     query: item.query,
     shouldHaveAnswer: item.should_have_answer,
@@ -114,6 +117,7 @@ function normalizeAssistantCase(item: AssistantEvaluationCaseResult): TriageCase
   return {
     source: "assistant",
     id: item.id,
+    caseResultId: item.case_result_id,
     category: item.category,
     assistantType: item.assistant_type,
     query: item.query,
@@ -148,8 +152,12 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
   const [failureReason, setFailureReason] = useState("all");
   const [fixType, setFixType] = useState("all");
   const [keyword, setKeyword] = useState("");
+  const [notesByCase, setNotesByCase] = useState<Record<string, EvaluationFailureTriageNote>>({});
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, { triage_status: string; note: string }>>({});
+  const [savingCaseId, setSavingCaseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [noteError, setNoteError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -159,8 +167,22 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
         evaluationApi.latestRetrieval(),
         evaluationApi.latestAssistants(),
       ]);
+      const runIds = [retrieval?.id, assistant?.run_id].filter((value): value is string => Boolean(value));
+      const noteLists = await Promise.all(
+        runIds.map((evaluation_run_id) => evaluationApi.listFailureTriageNotes({ evaluation_run_id })),
+      );
+      const notes = Object.fromEntries(noteLists.flat().map((note) => [note.evaluation_case_result_id, note]));
       setLatestRetrieval(retrieval);
       setLatestAssistant(assistant);
+      setNotesByCase(notes);
+      setNoteDrafts(
+        Object.fromEntries(
+          Object.entries(notes).map(([caseResultId, note]) => [
+            caseResultId,
+            { triage_status: note.triage_status || "open", note: note.note || "" },
+          ]),
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load evaluation failures");
     } finally {
@@ -209,13 +231,52 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
     (item) => item.failureReason.includes("no_answer") || item.failureReason === "answered_should_no_answer",
   ).length;
 
+  function draftFor(item: TriageCase) {
+    if (!item.caseResultId) return { triage_status: "open", note: "" };
+    return (
+      noteDrafts[item.caseResultId] || {
+        triage_status: notesByCase[item.caseResultId]?.triage_status || "open",
+        note: notesByCase[item.caseResultId]?.note || "",
+      }
+    );
+  }
+
+  function setDraft(caseResultId: string, patch: Partial<{ triage_status: string; note: string }>) {
+    setNoteDrafts((current) => ({
+      ...current,
+      [caseResultId]: {
+        triage_status: current[caseResultId]?.triage_status || notesByCase[caseResultId]?.triage_status || "open",
+        note: current[caseResultId]?.note ?? notesByCase[caseResultId]?.note ?? "",
+        ...patch,
+      },
+    }));
+  }
+
+  async function saveNote(item: TriageCase) {
+    if (!item.caseResultId) return;
+    setSavingCaseId(item.caseResultId);
+    setNoteError("");
+    try {
+      const draft = draftFor(item);
+      const saved = await evaluationApi.upsertFailureTriageNote(item.caseResultId, {
+        triage_status: draft.triage_status,
+        note: draft.note.trim() || null,
+      });
+      setNotesByCase((current) => ({ ...current, [item.caseResultId as string]: saved }));
+      setDraft(item.caseResultId, { triage_status: saved.triage_status, note: saved.note || "" });
+    } catch (err) {
+      setNoteError(err instanceof Error ? err.message : "Failed to save triage note");
+    } finally {
+      setSavingCaseId(null);
+    }
+  }
   return (
     <section className="panel">
       <div className="section-heading">
         <div>
           <h2>Evaluation Failure Triage</h2>
           <p className="muted">
-            Read-only triage of the latest retrieval and assistant evaluation failures.
+            Triage latest retrieval and assistant evaluation failures, with persisted review notes.
           </p>
         </div>
         <div className="actions">
@@ -226,6 +287,7 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
 
       {loading && <p className="muted">Loading failed cases...</p>}
       {error && <p className="error">{error}</p>}
+      {noteError && <p className="error">{noteError}</p>}
 
       <div className="metric-grid dashboard-cards">
         <div className="dashboard-card">
@@ -320,6 +382,7 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
               <th>Hit@1 / Hit@3</th>
               <th>Keyword / Metadata</th>
               <th>Top documents</th>
+              <th>Triage note</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -365,6 +428,35 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
                   )}
                 </td>
                 <td>
+                  {item.caseResultId ? (
+                    <div className="triage-note-editor">
+                      <select
+                        value={draftFor(item).triage_status}
+                        onChange={(event) => setDraft(item.caseResultId as string, { triage_status: event.target.value })}
+                      >
+                        <option value="open">Open</option>
+                        <option value="reviewing">Reviewing</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="ignored">Ignored</option>
+                      </select>
+                      <textarea
+                        value={draftFor(item).note}
+                        onChange={(event) => setDraft(item.caseResultId as string, { note: event.target.value })}
+                        placeholder="Persist a short triage note"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveNote(item)}
+                        disabled={savingCaseId === item.caseResultId}
+                      >
+                        {savingCaseId === item.caseResultId ? "Saving..." : "Save note"}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="muted">No case snapshot id</span>
+                  )}
+                </td>
+                <td>
                   <div className="actions">
                     <button type="button" onClick={onOpenEvaluation}>Workbench</button>
                     <button type="button" onClick={() => onOpenAnnotations(annotationSearchFor(item))}>
@@ -379,7 +471,7 @@ export function EvaluationFailureTriagePage({ onOpenEvaluation, onOpenAnnotation
       )}
 
       <div className="subtle-note">
-        This page is advisory only. It does not create annotations, generate improvement items, rerun evaluation,
+        This page is advisory. It can persist lightweight triage notes, but it does not create annotations, generate improvement items, rerun evaluation,
         call LLMs, or change production metadata, prompts, chunking, rerank settings, or indexes.
       </div>
     </section>

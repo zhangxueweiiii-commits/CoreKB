@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.evaluation_annotation import EvaluationCaseAnnotation
 from app.models.evaluation_run import EvaluationCaseResult, EvaluationRun
+from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.services.evaluation_run_metadata_service import format_evaluation_run_display
 
 
@@ -67,6 +68,7 @@ class EvaluationCaseDrilldownService:
             "citations": record.citations,
             "retrieved_results": record.retrieved_results,
             "annotation": self._annotation_payload(record.id),
+            "triage_note": self._triage_note_payload(record.id),
             "created_at": record.created_at,
         }
 
@@ -89,6 +91,25 @@ class EvaluationCaseDrilldownService:
             "annotated_by": annotation.annotated_by,
             "annotated_at": annotation.annotated_at,
             "updated_at": annotation.updated_at,
+        }
+
+    def _triage_note_payload(self, case_result_id: UUID) -> dict | None:
+        note = self.db.scalar(
+            select(EvaluationFailureTriageNote).where(
+                EvaluationFailureTriageNote.evaluation_case_result_id == case_result_id
+            )
+        )
+        if note is None:
+            return None
+        return {
+            "id": note.id,
+            "evaluation_case_result_id": note.evaluation_case_result_id,
+            "triage_status": note.triage_status.value,
+            "note": note.note,
+            "created_by": note.created_by,
+            "updated_by": note.updated_by,
+            "created_at": note.created_at,
+            "updated_at": note.updated_at,
         }
 
     def _comparison(self, before: EvaluationCaseResult | None, after: EvaluationCaseResult | None) -> dict:

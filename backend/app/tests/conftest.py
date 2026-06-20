@@ -11,6 +11,7 @@ from app.models.evaluation_run import EvaluationCaseResult, EvaluationRun
 from app.models.evaluation_annotation import EvaluationCaseAnnotation
 from app.models.evaluation_improvement import EvaluationImprovementItem, EvaluationImprovementItemCaseResult
 from app.models.evaluation_regression import EvaluationRegression
+from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.models.index_job import IndexJob, IndexJobItem
 from app.models.knowledge_base import KBPermission, KnowledgeBase
 from app.models.metadata_dictionary import MetadataDictionaryEntry
@@ -44,6 +45,7 @@ def db_session() -> Generator[Session, None, None]:
         EvaluationCaseResult.__table__,
         EvaluationCaseAnnotation.__table__,
         EvaluationRegression.__table__,
+        EvaluationFailureTriageNote.__table__,
         EvaluationImprovementItem.__table__,
         EvaluationImprovementItemCaseResult.__table__,
         IndexJob.__table__,
