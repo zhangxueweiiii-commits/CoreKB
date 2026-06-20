@@ -38,6 +38,22 @@ Any change that affects production behavior must be reviewed and explicitly appr
    - Check regression warnings and case-level evidence.
    - Record risk notes and remaining limitations.
 
+## Closed-Loop Verification
+
+The metadata quality loop is verified as a sequence of explicit boundaries:
+
+1. `documents.metadata` is inspected by the read-only validator.
+2. Validation issues can be persisted as `validation_reports`.
+3. A validation report can create pending metadata suggestions through the bridge.
+4. The bridge stage must not mutate `documents.metadata`.
+5. The bridge stage must not create index jobs or enqueue reindexing.
+6. A reviewer must explicitly accept or reject each suggestion.
+7. Accepting a suggestion is the only step in this loop that writes formal document metadata and submits a single-document reindex.
+8. Rejecting a suggestion must preserve formal metadata and index state.
+9. Audit logs must distinguish bridge generation, acceptance, and rejection.
+
+This keeps advisory evidence separate from production-impacting actions.
+
 ## Guardrails
 
 - No automatic production metadata overwrite.

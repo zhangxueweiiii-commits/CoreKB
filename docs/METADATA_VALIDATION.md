@@ -192,3 +192,24 @@ The review UI does not:
 - call an LLM
 
 It is a human review surface for existing diagnostics and pending suggestion creation only. Formal metadata changes still require explicit acceptance through the metadata suggestion review controls.
+
+## Closed-Loop Verification
+
+CoreKB has backend tests that verify the metadata validation review loop end to end:
+
+```text
+validation report -> pending suggestion bridge -> explicit accept/reject
+```
+
+The verification checks that the advisory bridge remains non-mutating:
+
+- creating pending suggestions from a validation report does not modify `documents.metadata`
+- creating pending suggestions from a validation report does not create index jobs
+- creating pending suggestions from a validation report does not enqueue reindexing
+- accepting a suggestion explicitly writes only the reviewed metadata field
+- accepting a suggestion creates and enqueues one single-document index job
+- rejecting a suggestion preserves metadata and index state
+- audit logs distinguish report bridge generation, acceptance, and rejection
+
+These tests are intentionally separate from UI tests. They protect the production boundary between advisory diagnostics and reviewed metadata changes.
+
