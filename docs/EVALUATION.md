@@ -1357,3 +1357,22 @@ Use the commands in this order when validating a CoreKB environment:
 3. `make eval-real`: call the live API after the Evaluation KB has been imported and indexed.
 
 `eval-real` does not import backend services directly and does not connect directly to PostgreSQL, Qdrant, Redis, Celery, embedding providers, rerank providers, or LLMs. Those dependencies are reached only through the already running CoreKB API. It does not mutate documents, metadata, suggestions, or source files, but it does create evaluation records through the API by design.
+
+## Evaluation Result Dashboard
+
+The frontend includes an admin-only `Eval Dashboard` page for a read-only overview of recent evaluation results. It reuses existing evaluation APIs and does not create evaluation runs or modify evaluation data.
+
+The dashboard shows:
+
+- latest retrieval Hit@3, MRR, and no-answer accuracy
+- latest assistant quality gate and citation rate
+- open improvement item count
+- open annotation count
+- regression pass rate
+- recent retrieval and assistant evaluation runs
+- assistant trend warnings
+- recent regression records
+
+Use the dashboard for quick status checks. Use the full `Evaluation` workbench when you need to run evaluations, compare runs, inspect failed cases, generate improvement items, or manage annotations.
+
+The dashboard intentionally uses cards and tables only. It does not add charts, BI features, new backend APIs, or write actions.

@@ -408,3 +408,25 @@ blockquote {
     min-height: auto;
   }
 }
+
+.dashboard-cards {
+  margin: 16px 0 8px;
+}
+
+.dashboard-card {
+  background: #f8fbfc;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-height: 120px;
+  padding: 16px;
+}
+
+.dashboard-card strong {
+  font-size: 24px;
+}
+
+.dashboard-card small {
+  color: #63747d;
+}

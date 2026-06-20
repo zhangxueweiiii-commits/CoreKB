@@ -17,6 +17,7 @@ export function Layout({ user, active, onNavigate, onLogout, children }: LayoutP
     ["indexJobs", "Index Jobs"],
     ...(user.role === "admin"
       ? [
+          ["evaluationDashboard", "Eval Dashboard"],
           ["evaluation", "Evaluation"],
           ["annotations", "Annotations"],
           ["auditLogs", "Audit Logs"],
@@ -35,7 +36,7 @@ export function Layout({ user, active, onNavigate, onLogout, children }: LayoutP
       <aside className="sidebar">
         <div className="brand">
           <strong>CoreKB</strong>
-          <span>知核</span>
+          <span>{"\u77e5\u6838"}</span>
         </div>
         <nav>
           {items.map(([key, label]) => (
