@@ -4,6 +4,7 @@ import {
   type DocumentItem,
   type DocumentMetadataSuggestion,
   type KnowledgeBase,
+  type TablePreviewResponse,
   type ValidationReport,
   type ValidationReportBridgeResponse,
 } from "../api/client";
@@ -29,6 +30,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const processingStatuses = new Set(["uploaded", "parsing", "chunking", "embedding"]);
+const tableFileTypes = new Set(["csv", "xlsx", "xls"]);
 
 function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;
@@ -47,6 +49,8 @@ export function KnowledgeBaseDetail({
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [metadataSuggestions, setMetadataSuggestions] = useState<DocumentMetadataSuggestion[]>([]);
   const [validationReports, setValidationReports] = useState<ValidationReport[]>([]);
+  const [tablePreview, setTablePreview] = useState<TablePreviewResponse | null>(null);
+  const [tablePreviewLoading, setTablePreviewLoading] = useState(false);
   const [validationBridgeResult, setValidationBridgeResult] = useState<ValidationReportBridgeResponse | null>(null);
   const [pendingSuggestionCounts, setPendingSuggestionCounts] = useState<Record<string, number>>({});
   const [metadataFilter, setMetadataFilter] = useState("all");
@@ -118,7 +122,11 @@ export function KnowledgeBaseDetail({
         : null;
       if (focusDocument) {
         setSelectedDocument(focusDocument);
-        Promise.all([loadMetadataSuggestions(focusDocument.id), loadValidationReports(focusDocument.id)]).catch((err) =>
+        Promise.all([
+          loadMetadataSuggestions(focusDocument.id),
+          loadValidationReports(focusDocument.id),
+          isTableDocument(focusDocument) ? loadTablePreview(focusDocument.id) : Promise.resolve(setTablePreview(null)),
+        ]).catch((err) =>
           setError(err instanceof Error ? err.message : "Failed to load document review data"),
         );
       } else {
@@ -148,6 +156,21 @@ export function KnowledgeBaseDetail({
     const response = await api.validationReports(documentId);
     setValidationReports(response);
   }
+  function isTableDocument(document: DocumentItem) {
+    return tableFileTypes.has(document.file_type.toLowerCase());
+  }
+
+  async function loadTablePreview(documentId: string) {
+    setTablePreviewLoading(true);
+    try {
+      setTablePreview(await api.tablePreview(documentId, 30));
+    } catch (err) {
+      setTablePreview(null);
+      setError(err instanceof Error ? err.message : "Failed to load table preview");
+    } finally {
+      setTablePreviewLoading(false);
+    }
+  }
 
   useEffect(() => {
     setDocuments([]);
@@ -155,6 +178,7 @@ export function KnowledgeBaseDetail({
     setMetadataSuggestions([]);
     setValidationReports([]);
     setValidationBridgeResult(null);
+    setTablePreview(null);
     setPendingSuggestionCounts({});
     setError("");
     loadDocuments(true);
@@ -276,7 +300,12 @@ export function KnowledgeBaseDetail({
   function openDocument(document: DocumentItem) {
     setSelectedDocument(document);
     setValidationBridgeResult(null);
-    Promise.all([loadMetadataSuggestions(document.id), loadValidationReports(document.id)]).catch((err) =>
+    setTablePreview(null);
+    Promise.all([
+      loadMetadataSuggestions(document.id),
+      loadValidationReports(document.id),
+      isTableDocument(document) ? loadTablePreview(document.id) : Promise.resolve(setTablePreview(null)),
+    ]).catch((err) =>
       setError(err instanceof Error ? err.message : "Failed to load document review data"),
     );
   }
@@ -439,6 +468,57 @@ export function KnowledgeBaseDetail({
             <dt>Formal metadata</dt>
             <dd><pre>{JSON.stringify(selectedDocument.meta || {}, null, 2)}</pre></dd>
           </dl>
+
+          {isTableDocument(selectedDocument) && (
+            <div className="subtle-block table-preview-block">
+              <div className="section-heading">
+                <h4>Table preview</h4>
+                <button type="button" onClick={() => loadTablePreview(selectedDocument.id)} disabled={tablePreviewLoading}>
+                  {tablePreviewLoading ? "Loading..." : "Refresh preview"}
+                </button>
+              </div>
+              <p className="muted">
+                Read-only preview from the stored source file. It does not create suggestions, update metadata, or trigger indexing.
+              </p>
+              {tablePreviewLoading && <p className="muted">Loading table preview...</p>}
+              {!tablePreviewLoading && !tablePreview && <p className="muted">No table preview loaded.</p>}
+              {tablePreview?.tables.length === 0 && <p className="muted">No non-empty tables found in this document.</p>}
+              {tablePreview?.tables.map((table) => (
+                <div className="table-preview-sheet" key={`${table.sheet_name}-${table.table_index}`}>
+                  <div className="table-preview-meta">
+                    <strong>{table.sheet_name}</strong>
+                    <span>Rows {table.source_range}</span>
+                    <span>{table.row_count} row(s)</span>
+                    <span>{table.column_count} column(s)</span>
+                    {table.truncated && <span>Showing first {table.rows.length} row(s)</span>}
+                  </div>
+                  <div className="table-preview-scroll">
+                    <table className="nested-table">
+                      <thead>
+                        <tr>
+                          <th>Row</th>
+                          {table.headers.map((header) => (
+                            <th key={`${table.table_index}-${header}`}>{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {table.rows.map((row) => (
+                          <tr key={`${table.table_index}-${row.row_number}`}>
+                            <td>{row.row_number}</td>
+                            {table.headers.map((header) => (
+                              <td key={`${row.row_number}-${header}`}>{row.values[header] || ""}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="subtle-block">
             <div className="section-heading">
               <h4>Validation reports</h4>

@@ -75,6 +75,30 @@ class ValidationReportSuggestionBridgeResponse(BaseModel):
     skipped_issues: list[ValidationReportSuggestionSkippedIssue] = Field(default_factory=list)
 
 
+
+class TablePreviewRow(BaseModel):
+    row_number: int
+    values: dict[str, str]
+    raw_text: str
+
+
+class TablePreviewTable(BaseModel):
+    sheet_name: str
+    table_index: int
+    headers: list[str]
+    row_count: int
+    column_count: int
+    source_range: str
+    rows: list[TablePreviewRow] = Field(default_factory=list)
+    truncated: bool = False
+
+
+class TablePreviewResponse(BaseModel):
+    document_id: UUID
+    filename: str
+    file_type: str
+    tables: list[TablePreviewTable] = Field(default_factory=list)
+
 class DocumentChunkRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
