@@ -80,6 +80,9 @@ If the task scope is unclear, the agent should stop before editing production-im
 ## Current Entry Points
 
 - `make agent-test`: verifies that the agent workflow files exist.
-- `make eval`: placeholder for a future read-only evaluation command.
+- `make eval`: runs a deterministic, read-only evaluation fixture baseline.
 
-The `eval` target is intentionally a placeholder in this initialization step. A later task can connect it to the CoreKB retrieval and assistant evaluation workflow once the command contract is defined.
+The current `eval` target validates `backend/tests/evaluation/fixtures/expected/eval_cases.json` and summarizes fixture coverage by category, assistant type, answerability, and expected metadata fields. It does not connect to PostgreSQL, Qdrant, Redis, Celery, rerank providers, or LLMs, and it does not mutate production data.
+
+A later scoped task can connect the command to live retrieval and assistant evaluation once that execution contract is explicitly reviewed.
+

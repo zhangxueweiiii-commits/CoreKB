@@ -1267,3 +1267,34 @@ GET /api/evaluation/improvements/{item_id}/annotations
 - 不自动修改 prompt、metadata、chunking 或 rerank。
 - 不调用 LLM 自动分析。
 - 不自动判断真实业务正确性。
+
+## Evaluation Runner Baseline
+
+`make eval` now runs a deterministic read-only baseline over `backend/tests/evaluation/fixtures/expected/eval_cases.json`:
+
+```bash
+make eval
+```
+
+Equivalent direct command:
+
+```bash
+python scripts/run_evaluation_baseline.py --cases backend/tests/evaluation/fixtures/expected/eval_cases.json
+```
+
+This baseline validates fixture readiness before live retrieval or assistant evaluation. It reports:
+
+- total case count
+- answerable and no-answer case counts
+- category coverage
+- assistant type coverage
+- expected metadata field coverage
+- duplicate case ids
+- missing required fields
+- invalid category or assistant type values
+
+The command is intentionally read-only. It does not connect to PostgreSQL, Qdrant, Redis, Celery, rerank providers, embedding services, or LLMs. It does not upload documents, create evaluation runs, create suggestions, mutate `documents.metadata`, or trigger reindexing.
+
+A successful baseline means the fixture file is structurally ready for a later live evaluation workflow. It does not prove retrieval quality, answer quality, citation correctness, or rerank effectiveness. Those still require the existing API-backed retrieval and assistant evaluation paths after fixtures have been imported and indexed.
+
+If the baseline exits non-zero, fix duplicate case ids, missing required fields, or unsupported category / assistant type values before running live evaluation.
