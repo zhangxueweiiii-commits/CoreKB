@@ -8,4 +8,4 @@ agent-run:
 	python agent/runner.py init-result --task $(TASK)
 
 eval:
-	@echo "CoreKB evaluation placeholder. Future tasks should wire this to the retrieval and assistant evaluation workflow."
+	python scripts/run_evaluation_baseline.py --cases backend/tests/evaluation/fixtures/expected/eval_cases.json
