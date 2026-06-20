@@ -1318,3 +1318,42 @@ The smoke runner loads `eval_cases.json`, builds deterministic fake retrieval re
 This is still a read-only tooling check. It does not connect to PostgreSQL, Qdrant, Redis, Celery, embedding providers, rerank providers, or LLMs. It does not create `evaluation_runs`, persist `evaluation_case_results`, upload documents, create suggestions, mutate `documents.metadata`, or trigger reindexing.
 
 Use this smoke test after `make eval` passes and before running the heavier API-backed retrieval evaluation. Passing smoke results mean the evaluation code path is structurally healthy with deterministic retrieval, not that production retrieval quality is good.
+
+## Real Retrieval Evaluation Harness
+
+`make eval-real` runs the real retrieval evaluation harness against an already running CoreKB API:
+
+```bash
+COREKB_ADMIN_TOKEN=... COREKB_API_BASE_URL=http://localhost:8000 make eval-real
+```
+
+Equivalent direct command:
+
+```bash
+COREKB_ADMIN_TOKEN=... python scripts/run_real_retrieval_evaluation.py \
+  --api-base-url http://localhost:8000 \
+  --confirm-persist
+```
+
+The harness calls existing API endpoints only:
+
+- `POST /api/evaluation/retrieval/run` for a single retrieval evaluation run.
+- `POST /api/evaluation/retrieval/compare` when `--mode compare` is used.
+
+The harness requires an admin bearer token via `COREKB_ADMIN_TOKEN` or `--token`. It also requires `--confirm-persist` because the existing API creates `evaluation_runs` and `evaluation_case_results` records. This confirmation prevents accidental writes during local experimentation.
+
+Useful options:
+
+```bash
+python scripts/run_real_retrieval_evaluation.py --confirm-persist --use-metadata-filter
+python scripts/run_real_retrieval_evaluation.py --confirm-persist --use-metadata-filter --use-rerank --rerank-top-n 20
+python scripts/run_real_retrieval_evaluation.py --confirm-persist --mode compare --rerank-top-n 20
+```
+
+Use the commands in this order when validating a CoreKB environment:
+
+1. `make eval`: validate fixture shape and coverage.
+2. `make eval-smoke`: exercise evaluation logic with deterministic fake retrieval.
+3. `make eval-real`: call the live API after the Evaluation KB has been imported and indexed.
+
+`eval-real` does not import backend services directly and does not connect directly to PostgreSQL, Qdrant, Redis, Celery, embedding providers, rerank providers, or LLMs. Those dependencies are reached only through the already running CoreKB API. It does not mutate documents, metadata, suggestions, or source files, but it does create evaluation records through the API by design.
