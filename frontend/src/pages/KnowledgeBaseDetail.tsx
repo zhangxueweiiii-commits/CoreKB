@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type DocumentItem, type DocumentMetadataSuggestion, type KnowledgeBase } from "../api/client";
+import {
+  api,
+  type DocumentItem,
+  type DocumentMetadataSuggestion,
+  type KnowledgeBase,
+  type ValidationReport,
+  type ValidationReportBridgeResponse,
+} from "../api/client";
 import { indexJobsApi, type IndexJobSummary } from "../api/indexJobs";
 import { KbPermissionManager } from "../components/KbPermissionManager";
 import type { MetadataReviewFocus } from "../utils/metadataPrecheckNavigation";
@@ -39,6 +46,8 @@ export function KnowledgeBaseDetail({
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [metadataSuggestions, setMetadataSuggestions] = useState<DocumentMetadataSuggestion[]>([]);
+  const [validationReports, setValidationReports] = useState<ValidationReport[]>([]);
+  const [validationBridgeResult, setValidationBridgeResult] = useState<ValidationReportBridgeResponse | null>(null);
   const [pendingSuggestionCounts, setPendingSuggestionCounts] = useState<Record<string, number>>({});
   const [metadataFilter, setMetadataFilter] = useState("all");
   const [jobs, setJobs] = useState<IndexJobSummary[]>([]);
@@ -80,6 +89,10 @@ export function KnowledgeBaseDetail({
     return JSON.stringify(value);
   }
 
+  function formatIssueValue(value: unknown) {
+    return formatMetadataValue(value);
+  }
+
   async function loadPendingSuggestionCounts() {
     if (!knowledgeBase) return;
     try {
@@ -105,8 +118,8 @@ export function KnowledgeBaseDetail({
         : null;
       if (focusDocument) {
         setSelectedDocument(focusDocument);
-        loadMetadataSuggestions(focusDocument.id).catch((err) =>
-          setError(err instanceof Error ? err.message : "Failed to load metadata suggestions"),
+        Promise.all([loadMetadataSuggestions(focusDocument.id), loadValidationReports(focusDocument.id)]).catch((err) =>
+          setError(err instanceof Error ? err.message : "Failed to load document review data"),
         );
       } else {
         setSelectedDocument((current) =>
@@ -131,10 +144,17 @@ export function KnowledgeBaseDetail({
     setMetadataSuggestions(response.items);
   }
 
+  async function loadValidationReports(documentId: string) {
+    const response = await api.validationReports(documentId);
+    setValidationReports(response);
+  }
+
   useEffect(() => {
     setDocuments([]);
     setSelectedDocument(null);
     setMetadataSuggestions([]);
+    setValidationReports([]);
+    setValidationBridgeResult(null);
     setPendingSuggestionCounts({});
     setError("");
     loadDocuments(true);
@@ -240,10 +260,24 @@ export function KnowledgeBaseDetail({
     }
   }
 
+  async function createSuggestionsFromReport(reportId: string) {
+    if (!selectedDocument) return;
+    setError("");
+    setValidationBridgeResult(null);
+    try {
+      const response = await api.createSuggestionsFromValidationReport(reportId);
+      setValidationBridgeResult(response);
+      await Promise.all([loadMetadataSuggestions(selectedDocument.id), loadPendingSuggestionCounts()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create pending suggestions from validation report");
+    }
+  }
+
   function openDocument(document: DocumentItem) {
     setSelectedDocument(document);
-    loadMetadataSuggestions(document.id).catch((err) =>
-      setError(err instanceof Error ? err.message : "Failed to load metadata suggestions"),
+    setValidationBridgeResult(null);
+    Promise.all([loadMetadataSuggestions(document.id), loadValidationReports(document.id)]).catch((err) =>
+      setError(err instanceof Error ? err.message : "Failed to load document review data"),
     );
   }
 
@@ -405,6 +439,104 @@ export function KnowledgeBaseDetail({
             <dt>Formal metadata</dt>
             <dd><pre>{JSON.stringify(selectedDocument.meta || {}, null, 2)}</pre></dd>
           </dl>
+          <div className="subtle-block">
+            <div className="section-heading">
+              <h4>Validation reports</h4>
+              <button type="button" onClick={() => loadValidationReports(selectedDocument.id)}>
+                Refresh reports
+              </button>
+            </div>
+            <p className="muted">
+              Validation reports are diagnostic snapshots. Creating suggestions from a report only creates pending review
+              items; it does not accept suggestions, update formal metadata, or trigger reindexing.
+            </p>
+            {validationBridgeResult && (
+              <div className="notice">
+                Created {validationBridgeResult.created_count} pending suggestion(s), found{" "}
+                {validationBridgeResult.existing_count} existing suggestion(s), skipped{" "}
+                {validationBridgeResult.skipped_count} issue(s).
+                {validationBridgeResult.skipped_issues.length > 0 && (
+                  <ul>
+                    {validationBridgeResult.skipped_issues.map((issue, index) => (
+                      <li key={`${issue.field || "unknown"}-${issue.code || "code"}-${index}`}>
+                        {issue.field || "unknown field"}: {issue.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {validationReports.length === 0 ? (
+              <p className="muted">No validation reports for this document yet.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Created</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Issues</th>
+                    <th>Summary</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validationReports.map((report) => (
+                    <tr key={report.id}>
+                      <td>{new Date(report.created_at).toLocaleString()}</td>
+                      <td>{report.report_type}</td>
+                      <td>
+                        <span className={`status-pill status-${report.severity}`}>{report.severity}</span>
+                      </td>
+                      <td>{report.status}</td>
+                      <td>
+                        <details>
+                          <summary>{report.issue_count} issue(s)</summary>
+                          {report.issues_json.length === 0 ? (
+                            <p className="muted">No issues recorded.</p>
+                          ) : (
+                            <table className="nested-table">
+                              <thead>
+                                <tr>
+                                  <th>Field</th>
+                                  <th>Code</th>
+                                  <th>Current</th>
+                                  <th>Expected</th>
+                                  <th>Message</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {report.issues_json.map((issue, index) => (
+                                  <tr key={`${report.id}-${issue.field}-${issue.code}-${index}`}>
+                                    <td>{issue.field}</td>
+                                    <td>{issue.code}</td>
+                                    <td>{formatIssueValue(issue.current_value)}</td>
+                                    <td>{formatIssueValue(issue.expected)}</td>
+                                    <td>{issue.message}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </details>
+                      </td>
+                      <td>{report.summary || "-"}</td>
+                      <td>
+                        {canEdit && report.issue_count > 0 ? (
+                          <button type="button" onClick={() => createSuggestionsFromReport(report.id)}>
+                            Create pending suggestions
+                          </button>
+                        ) : (
+                          <span className="muted">Read-only</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
           {isPrecheckFocus && focusField && (
             <div className="subtle-note">
               <strong>Focused field:</strong> {focusField}. Current formal value:{" "}

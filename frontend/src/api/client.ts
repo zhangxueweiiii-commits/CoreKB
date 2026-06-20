@@ -76,6 +76,38 @@ export interface DocumentMetadataSuggestionList {
   total: number;
 }
 
+export interface ValidationReportIssue {
+  field: string;
+  code: string;
+  severity: "info" | "warning" | "error" | string;
+  message: string;
+  current_value?: unknown;
+  expected?: unknown;
+}
+
+export interface ValidationReport {
+  id: string;
+  document_id: string;
+  report_type: "metadata" | string;
+  severity: "info" | "warning" | "error" | string;
+  issue_count: number;
+  issues_json: ValidationReportIssue[];
+  summary?: string | null;
+  status: "open" | "resolved" | "ignored" | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ValidationReportBridgeResponse {
+  report_id: string;
+  document_id: string;
+  created_count: number;
+  existing_count: number;
+  skipped_count: number;
+  items: DocumentMetadataSuggestion[];
+  skipped_issues: Array<{ field?: string | null; code?: string | null; reason: string }>;
+}
+
 export interface SearchResult {
   chunk_text: string;
   filename: string;
@@ -206,6 +238,14 @@ export const api = {
     }),
   rejectMetadataSuggestion: (documentId: string, suggestionId: string) =>
     request<DocumentMetadataSuggestion>(`/documents/${documentId}/metadata-suggestions/${suggestionId}/reject`, {
+      method: "POST",
+    }),
+  validationReports: (documentId: string) =>
+    request<ValidationReport[]>(`/documents/${documentId}/validation-reports`),
+  validationReport: (reportId: string) =>
+    request<ValidationReport>(`/validation-reports/${reportId}`),
+  createSuggestionsFromValidationReport: (reportId: string) =>
+    request<ValidationReportBridgeResponse>(`/validation-reports/${reportId}/metadata-suggestions`, {
       method: "POST",
     }),
   search: (payload: { query: string; knowledge_base_ids: string[]; top_k: number; metadata_filter?: Record<string, string>; use_rerank?: boolean; rerank_top_n?: number }) =>
