@@ -18,6 +18,7 @@ export function Layout({ user, active, onNavigate, onLogout, children }: LayoutP
     ...(user.role === "admin"
       ? [
           ["evaluationDashboard", "Eval Dashboard"],
+          ["evaluationFailureTriage", "Failure Triage"],
           ["evaluation", "Evaluation"],
           ["annotations", "Annotations"],
           ["auditLogs", "Audit Logs"],

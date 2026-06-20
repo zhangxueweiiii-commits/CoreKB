@@ -430,3 +430,13 @@ blockquote {
 .dashboard-card small {
   color: #63747d;
 }
+
+.compact-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.compact-list li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}

@@ -1376,3 +1376,29 @@ The dashboard shows:
 Use the dashboard for quick status checks. Use the full `Evaluation` workbench when you need to run evaluations, compare runs, inspect failed cases, generate improvement items, or manage annotations.
 
 The dashboard intentionally uses cards and tables only. It does not add charts, BI features, new backend APIs, or write actions.
+
+
+## Evaluation Failure Triage
+
+The Evaluation Failure Triage page is a lightweight, read-only admin view for the latest retrieval and assistant evaluation failures.
+
+It exists to help reviewers quickly group failed cases before opening the full Evaluation workbench. It combines the latest retrieval failed cases and the latest assistant failed cases, then supports simple filters for:
+
+- source: retrieval or assistant
+- assistant type
+- failure reason
+- suggested fix type
+- keyword in case id, query, expected document, or reason
+
+The summary cards highlight likely problem clusters such as metadata-related failures, missing citations, no-answer behavior, retrieval failures, and assistant failures. Retrieval failures use conservative UI-side labels derived from existing metrics such as Hit@1, Hit@5, keyword match rate, metadata match rate, and no-answer correctness. Assistant failures use the persisted `failure_reason` and `suggested_fix_type` values returned by the evaluation API.
+
+This page is advisory only. It does not:
+
+- create annotations
+- generate improvement items
+- rerun evaluation
+- call Search, Chat, Rerank, or LLM APIs
+- modify `documents.metadata`
+- modify prompts, chunking, rerank settings, indexes, or source documents
+
+Use it as a triage entry point, then open the Evaluation workbench, annotation list, case drill-down, or improvement items for deeper review.
