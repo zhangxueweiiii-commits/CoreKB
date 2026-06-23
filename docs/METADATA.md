@@ -387,3 +387,35 @@ The page also keeps an advanced JSON input for users who want to paste an exact 
 Table-specific evidence such as `sheet_name`, `row_start`, `row_end`, and `column_names` is displayed in results. The first UI version does not add row-range or sheet-name filtering because the backend Search API currently sanitizes filters to supported document metadata fields only.
 
 This UI does not modify `documents.metadata`, create metadata suggestions, change table parsing, reindex documents, or alter Qdrant payload behavior.
+
+## Table Metadata Filter Backend Support
+
+The backend metadata filter allowlist now includes table payload fields in addition to business metadata fields.
+
+Supported table filter fields:
+
+- `source_type`
+- `sheet_name`
+- `table_index`
+- `row_start`
+- `row_end`
+
+These fields use exact-match semantics. Numeric fields (`table_index`, `row_start`, and `row_end`) are parsed as integers before Qdrant filter conditions are built, so filters match the numeric payload values written during table indexing.
+
+Example Search API payload:
+
+```json
+{
+  "query": "P-A200-H protocol",
+  "knowledge_base_ids": ["..."],
+  "top_k": 5,
+  "metadata_filter": {
+    "source_type": "table",
+    "sheet_name": "Products",
+    "row_start": 4,
+    "row_end": 6
+  }
+}
+```
+
+Unsupported fields, empty values, and invalid numeric values are ignored by the sanitizer. This remains a read/query feature only; it does not modify documents, metadata, chunks, vectors, suggestions, or indexing jobs.

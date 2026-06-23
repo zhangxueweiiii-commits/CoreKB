@@ -1,7 +1,7 @@
 import re
 
 
-ALLOWED_METADATA_FILTER_FIELDS = {
+STRING_METADATA_FILTER_FIELDS = {
     "category",
     "doc_type",
     "equipment_model",
@@ -11,13 +11,24 @@ ALLOWED_METADATA_FILTER_FIELDS = {
     "process_name",
     "sop_code",
     "version",
+    "source_type",
+    "sheet_name",
 }
 
 
-def sanitize_metadata_filter(metadata_filter: dict | None) -> dict[str, str]:
+INTEGER_METADATA_FILTER_FIELDS = {
+    "table_index",
+    "row_start",
+    "row_end",
+}
+
+ALLOWED_METADATA_FILTER_FIELDS = STRING_METADATA_FILTER_FIELDS | INTEGER_METADATA_FILTER_FIELDS
+
+
+def sanitize_metadata_filter(metadata_filter: dict | None) -> dict[str, str | int]:
     if not metadata_filter:
         return {}
-    sanitized: dict[str, str] = {}
+    sanitized: dict[str, str | int] = {}
     for key, value in metadata_filter.items():
         if key not in ALLOWED_METADATA_FILTER_FIELDS:
             continue
@@ -25,6 +36,12 @@ def sanitize_metadata_filter(metadata_filter: dict | None) -> dict[str, str]:
             continue
         normalized = str(value).strip()
         if not normalized:
+            continue
+        if key in INTEGER_METADATA_FILTER_FIELDS:
+            try:
+                sanitized[key] = int(normalized)
+            except ValueError:
+                continue
             continue
         sanitized[key] = normalized
     return sanitized
