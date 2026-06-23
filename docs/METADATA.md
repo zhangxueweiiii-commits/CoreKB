@@ -341,3 +341,27 @@ The expected row citation contract is:
 The tests use fake embedding, vector store, and retrieval services. They do not require live Qdrant, Redis, Celery, rerank provider, or LLM calls.
 
 These tests are diagnostic guardrails only. They do not modify `documents.metadata`, create metadata suggestions, create chunks, write vectors, or trigger reindexing.
+
+## Table Search UX V1
+
+CoreKB includes a lightweight Search page for direct retrieval inspection.
+
+The Search page uses the existing `POST /api/search` endpoint and does not add backend behavior. Users can:
+
+- select one or more knowledge bases
+- enter a query
+- choose `top_k`
+- optionally pass metadata filter JSON
+- optionally enable rerank
+
+For table results, the UI highlights:
+
+- table match label
+- filename
+- sheet name
+- row range
+- column names when present in chunk metadata
+- vector, rerank, and final scores
+- the retrieved chunk text
+
+This is a display-only UX layer. It does not modify documents, metadata, chunks, vectors, evaluation data, or metadata suggestions.
