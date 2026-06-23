@@ -313,3 +313,31 @@ Current limits:
 - Preview does not infer merged-cell table structure.
 - Preview does not repair metadata or create suggestions.
 - Row citations point to chunk row ranges, not individual cell coordinates.
+
+## Table Row Retrieval Quality Tests
+
+CoreKB keeps a small regression test suite for table row retrieval quality.
+
+The tests verify that table row evidence survives these read paths:
+
+- `RetrievalService.search_with_options`
+- `POST /api/search`
+- `ChatService.citation`
+- retrieval evaluation `top_results`
+- persisted `evaluation_case_results.retrieved_results`
+
+The expected row citation contract is:
+
+```json
+{
+  "filename": "material_parameters.xlsx",
+  "sheet_name": "Products",
+  "row_start": 4,
+  "row_end": 6,
+  "chunk_id": "..."
+}
+```
+
+The tests use fake embedding, vector store, and retrieval services. They do not require live Qdrant, Redis, Celery, rerank provider, or LLM calls.
+
+These tests are diagnostic guardrails only. They do not modify `documents.metadata`, create metadata suggestions, create chunks, write vectors, or trigger reindexing.
