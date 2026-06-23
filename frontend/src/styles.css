@@ -208,6 +208,13 @@ td {
   gap: 8px;
 }
 
+.action-note {
+  color: #63747d;
+  display: inline-block;
+  font-size: 13px;
+  max-width: 220px;
+}
+
 .status-pill {
   border-radius: 999px;
   display: inline-block;
@@ -216,6 +223,7 @@ td {
 }
 
 .status-uploaded,
+.status-parsed,
 .status-parsing,
 .status-chunking,
 .status-embedding {
@@ -357,6 +365,31 @@ td {
   color: #17495a;
   margin: 12px 0;
   padding: 10px 12px;
+}
+
+.notice button {
+  margin-left: 10px;
+}
+
+.document-reindex-panel {
+  align-items: start;
+  background: #f8fbfc;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  padding: 14px;
+}
+
+.document-reindex-panel h4 {
+  margin: 0 0 6px;
+}
+
+@media (max-width: 900px) {
+  .document-reindex-panel {
+    grid-template-columns: 1fr;
+  }
 }
 
 .kb-picker {
