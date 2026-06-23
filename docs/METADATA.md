@@ -365,3 +365,25 @@ For table results, the UI highlights:
 - the retrieved chunk text
 
 This is a display-only UX layer. It does not modify documents, metadata, chunks, vectors, evaluation data, or metadata suggestions.
+
+## Table Metadata Filter UI
+
+The Search page includes a lightweight metadata filter builder for table-heavy searches. It helps users compose the existing Search API `metadata_filter` without hand-writing JSON.
+
+Supported structured fields match the backend metadata filter allowlist:
+
+- `category`
+- `doc_type`
+- `equipment_model`
+- `fault_code`
+- `material_code`
+- `product_model`
+- `process_name`
+- `sop_code`
+- `version`
+
+The page also keeps an advanced JSON input for users who want to paste an exact filter object. Advanced JSON values are merged with structured fields before search and take precedence when the same key appears in both places. The effective filter JSON is displayed before the search request is sent.
+
+Table-specific evidence such as `sheet_name`, `row_start`, `row_end`, and `column_names` is displayed in results. The first UI version does not add row-range or sheet-name filtering because the backend Search API currently sanitizes filters to supported document metadata fields only.
+
+This UI does not modify `documents.metadata`, create metadata suggestions, change table parsing, reindex documents, or alter Qdrant payload behavior.
