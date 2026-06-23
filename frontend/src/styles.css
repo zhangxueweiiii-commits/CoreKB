@@ -288,6 +288,10 @@ td {
   margin-bottom: 16px;
 }
 
+.compact-heading {
+  margin-bottom: 8px;
+}
+
 .metric-grid {
   display: grid;
   gap: 10px;
@@ -515,6 +519,45 @@ blockquote {
 
 .table-preview-scroll table {
   min-width: 640px;
+}
+
+.metadata-filter-builder {
+  background: #f8fbfc;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.metadata-filter-builder h3 {
+  margin: 0;
+}
+
+.metadata-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.effective-filter-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.effective-filter-preview span {
+  color: #63747d;
+  font-size: 13px;
+}
+
+.effective-filter-preview pre {
+  background: #172026;
+  border-radius: 6px;
+  color: #eef5f7;
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: 10px;
 }
 
 .search-page-form {
