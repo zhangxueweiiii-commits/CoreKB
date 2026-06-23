@@ -1,17 +1,27 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type KnowledgeBase, type SearchResult } from "../api/client";
 
-const METADATA_FILTER_FIELDS = [
-  { key: "category", label: "Category", placeholder: "maintenance / quality / sop / material" },
-  { key: "doc_type", label: "Document type", placeholder: "parameter_table / manual / sop" },
-  { key: "equipment_model", label: "Equipment model", placeholder: "A200" },
-  { key: "fault_code", label: "Fault code", placeholder: "E12" },
-  { key: "material_code", label: "Material code", placeholder: "MAT-001" },
-  { key: "product_model", label: "Product model", placeholder: "PX-200" },
-  { key: "process_name", label: "Process name", placeholder: "assembly" },
-  { key: "sop_code", label: "SOP code", placeholder: "SOP-001" },
-  { key: "version", label: "Version", placeholder: "V1.0" },
+const BUSINESS_METADATA_FILTER_FIELDS = [
+  { key: "category", label: "Category", placeholder: "maintenance / quality / sop / material", inputType: "text" },
+  { key: "doc_type", label: "Document type", placeholder: "parameter_table / manual / sop", inputType: "text" },
+  { key: "equipment_model", label: "Equipment model", placeholder: "A200", inputType: "text" },
+  { key: "fault_code", label: "Fault code", placeholder: "E12", inputType: "text" },
+  { key: "material_code", label: "Material code", placeholder: "MAT-001", inputType: "text" },
+  { key: "product_model", label: "Product model", placeholder: "PX-200", inputType: "text" },
+  { key: "process_name", label: "Process name", placeholder: "assembly", inputType: "text" },
+  { key: "sop_code", label: "SOP code", placeholder: "SOP-001", inputType: "text" },
+  { key: "version", label: "Version", placeholder: "V1.0", inputType: "text" },
 ] as const;
+
+const TABLE_METADATA_FILTER_FIELDS = [
+  { key: "source_type", label: "Source type", placeholder: "table", inputType: "text" },
+  { key: "sheet_name", label: "Sheet name", placeholder: "Products", inputType: "text" },
+  { key: "table_index", label: "Table index", placeholder: "0", inputType: "number" },
+  { key: "row_start", label: "Row start", placeholder: "4", inputType: "number" },
+  { key: "row_end", label: "Row end", placeholder: "6", inputType: "number" },
+] as const;
+
+const METADATA_FILTER_FIELDS = [...BUSINESS_METADATA_FILTER_FIELDS, ...TABLE_METADATA_FILTER_FIELDS] as const;
 
 type MetadataFilterField = (typeof METADATA_FILTER_FIELDS)[number]["key"];
 type MetadataFilterValues = Record<MetadataFilterField, string>;
@@ -26,6 +36,11 @@ const EMPTY_METADATA_FILTER: MetadataFilterValues = {
   process_name: "",
   sop_code: "",
   version: "",
+  source_type: "",
+  sheet_name: "",
+  table_index: "",
+  row_start: "",
+  row_end: "",
 };
 
 function resultTitle(result: SearchResult) {
@@ -167,14 +182,35 @@ export function SearchPage() {
             </button>
           </div>
           <p className="muted">
-            Use supported document metadata to narrow table-heavy searches. Sheet names and row ranges are shown in
-            results; this first UI keeps filtering to backend-supported metadata fields.
+            Use supported document and table metadata to narrow table-heavy searches. Numeric table fields are sent as
+            filter values and parsed by the backend before Qdrant lookup.
           </p>
+          <h4>Business metadata</h4>
           <div className="metadata-filter-grid">
-            {METADATA_FILTER_FIELDS.map((field) => (
+            {BUSINESS_METADATA_FILTER_FIELDS.map((field) => (
               <label key={field.key}>
                 {field.label}
                 <input
+                  type={field.inputType}
+                  value={structuredMetadataFilter[field.key]}
+                  onChange={(event) =>
+                    setStructuredMetadataFilter((current) => ({
+                      ...current,
+                      [field.key]: event.target.value,
+                    }))
+                  }
+                  placeholder={field.placeholder}
+                />
+              </label>
+            ))}
+          </div>
+          <h4>Table metadata</h4>
+          <div className="metadata-filter-grid table-filter-grid">
+            {TABLE_METADATA_FILTER_FIELDS.map((field) => (
+              <label key={field.key}>
+                {field.label}
+                <input
+                  type={field.inputType}
                   value={structuredMetadataFilter[field.key]}
                   onChange={(event) =>
                     setStructuredMetadataFilter((current) => ({

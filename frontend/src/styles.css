@@ -534,10 +534,21 @@ blockquote {
   margin: 0;
 }
 
+.metadata-filter-builder h4 {
+  color: #31444d;
+  font-size: 14px;
+  margin: 6px 0 -2px;
+}
+
 .metadata-filter-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.table-filter-grid {
+  border-left: 3px solid #b8d8c3;
+  padding-left: 12px;
 }
 
 .effective-filter-preview {
