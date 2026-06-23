@@ -12,6 +12,7 @@ interface LayoutProps {
 export function Layout({ user, active, onNavigate, onLogout, children }: LayoutProps) {
   const items = [
     ["kb", "Knowledge Bases"],
+    ["search", "Search"],
     ["chat", "Chat"],
     ["assistants", "Assistants"],
     ["indexJobs", "Index Jobs"],

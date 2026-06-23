@@ -516,3 +516,68 @@ blockquote {
 .table-preview-scroll table {
   min-width: 640px;
 }
+
+.search-page-form {
+  display: grid;
+  gap: 14px;
+  max-width: 920px;
+}
+
+.search-page-form textarea {
+  min-height: 72px;
+}
+
+.search-page-form input[type="checkbox"] {
+  width: auto;
+}
+
+.search-result-list {
+  display: grid;
+  gap: 14px;
+}
+
+.search-result-card {
+  border: 1px solid #e3e9ed;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.table-result-card {
+  border-color: #b8d8c3;
+}
+
+.search-result-header,
+.score-strip,
+.table-search-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-result-header {
+  justify-content: space-between;
+}
+
+.score-strip,
+.table-search-meta {
+  color: #63747d;
+  font-size: 13px;
+}
+
+.table-pill {
+  background: #dff6e7;
+  color: #176239;
+}
+
+.search-result-snippet {
+  background: #f6f8f9;
+  border-radius: 6px;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}

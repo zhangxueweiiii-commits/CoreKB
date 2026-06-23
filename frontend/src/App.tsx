@@ -17,6 +17,7 @@ import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MetadataDictionaryPage } from "./pages/MetadataDictionaryPage";
 import { MetadataPrecheckPage } from "./pages/MetadataPrecheckPage";
+import { SearchPage } from "./pages/SearchPage";
 import { SystemStatus } from "./pages/SystemStatus";
 import { UsersPage } from "./pages/UsersPage";
 import {
@@ -99,6 +100,7 @@ export function App() {
           }}
         />
       )}
+      {active === "search" && <SearchPage />}
       {active === "chat" && <ChatPage />}
       {active === "assistants" && <AssistantsPage />}
       {active === "evaluationDashboard" && <EvaluationDashboardPage onOpenEvaluation={() => setActive("evaluation")} />}
