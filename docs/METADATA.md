@@ -1,4 +1,4 @@
-# CoreKB Metadata
+﻿# CoreKB Metadata
 
 CoreKB uses document metadata to improve retrieval precision, metadata filters, rerank evaluation, and role assistant quality. Metadata is stored on `documents.metadata`, merged into chunk metadata during indexing, and written into Qdrant payloads.
 
@@ -86,11 +86,11 @@ Current extraction is conservative and does not call an LLM.
 Supported examples:
 
 - Equipment model: `A200`, `A-200`, `EQ-A200`
-- Fault code: `E12`, `E-12`, `ERR12`, `Error 12`, `故障�?E12`
+- Fault code: `E12`, `E-12`, `ERR12`, `Error 12`, `鏁呴殰鐮?E12`
 - Material code: `MAT-001`, `M001`, `WL-1001`
-- SOP code: `SOP-001`, `SOP001`, `作业指导�?SOP-001`
-- Version: `V1.0`, `Rev.A`, `版本 2.1`
-- Document type keywords: `维修手册`, `作业指导书`, `检验规范`, `物料规格书`, `产品参数表`
+- SOP code: `SOP-001`, `SOP001`, `浣滀笟鎸囧涔?SOP-001`
+- Version: `V1.0`, `Rev.A`, `鐗堟湰 2.1`
+- Document type keywords: `缁翠慨鎵嬪唽`, `浣滀笟鎸囧涔, `妫€楠岃鑼僠, `鐗╂枡瑙勬牸涔, `浜у搧鍙傛暟琛╜
 
 ## Normalization
 
@@ -384,7 +384,7 @@ Supported structured fields match the backend metadata filter allowlist:
 
 The page also keeps an advanced JSON input for users who want to paste an exact filter object. Advanced JSON values are merged with structured fields before search and take precedence when the same key appears in both places. The effective filter JSON is displayed before the search request is sent.
 
-Table-specific evidence such as `sheet_name`, `row_start`, `row_end`, and `column_names` is displayed in results. The first UI version does not add row-range or sheet-name filtering because the backend Search API currently sanitizes filters to supported document metadata fields only.
+Table-specific evidence such as `source_type`, `sheet_name`, `table_index`, `row_start`, `row_end`, and `column_names` is displayed in results. The Search page now exposes supported table filter fields for exact-match table searches; `column_names` remains display-only.
 
 This UI does not modify `documents.metadata`, create metadata suggestions, change table parsing, reindex documents, or alter Qdrant payload behavior.
 
@@ -419,3 +419,18 @@ Example Search API payload:
 ```
 
 Unsupported fields, empty values, and invalid numeric values are ignored by the sanitizer. This remains a read/query feature only; it does not modify documents, metadata, chunks, vectors, suggestions, or indexing jobs.
+
+
+## Enabled Table Filter UI Fields
+
+The Search page structured filter builder now exposes table filter fields supported by the backend sanitizer:
+
+- `source_type`
+- `sheet_name`
+- `table_index`
+- `row_start`
+- `row_end`
+
+These controls are merged with business metadata controls and the advanced JSON filter input before the Search request is sent. Advanced JSON still takes precedence for duplicate keys.
+
+Numeric UI values are submitted through the same `metadata_filter` object. The backend parses `table_index`, `row_start`, and `row_end` as integers before building Qdrant filter conditions. Filtering remains exact-match only; row containment or range-overlap search is not part of this UI task.
