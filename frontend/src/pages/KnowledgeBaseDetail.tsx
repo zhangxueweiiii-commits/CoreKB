@@ -25,17 +25,29 @@ const statusLabels: Record<string, string> = {
   parsing: "Parsing",
   chunking: "Chunking",
   embedding: "Embedding",
+  parsed: "Parsed",
   indexed: "Indexed",
   failed: "Failed",
 };
 
 const processingStatuses = new Set(["uploaded", "parsing", "chunking", "embedding"]);
+const retryableStatuses = new Set(["failed", "uploaded", "parsed"]);
 const tableFileTypes = new Set(["csv", "xlsx", "xls"]);
 
 function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function canRetryDocument(document: DocumentItem) {
+  return retryableStatuses.has(document.status);
+}
+
+function retryUnavailableReason(document: DocumentItem) {
+  if (processingStatuses.has(document.status)) return "This document is already being processed.";
+  if (document.status === "indexed") return "Indexed documents are not eligible for retry; use knowledge-base reindex if needed.";
+  return "Only failed, uploaded, or parsed documents can be retried.";
 }
 
 export function KnowledgeBaseDetail({
@@ -56,6 +68,8 @@ export function KnowledgeBaseDetail({
   const [metadataFilter, setMetadataFilter] = useState("all");
   const [jobs, setJobs] = useState<IndexJobSummary[]>([]);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [lastDocumentJob, setLastDocumentJob] = useState<{ documentId: string; filename: string; jobId: string } | null>(null);
+  const [reindexingDocumentId, setReindexingDocumentId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const metadataSectionRef = useRef<HTMLDivElement | null>(null);
@@ -230,15 +244,23 @@ export function KnowledgeBaseDetail({
     }
   }
 
-  async function retry(documentId: string) {
+  async function retry(document: DocumentItem, openJobAfterSubmit = false) {
+    const confirmed = window.confirm(
+      `Reprocess and reindex "${document.filename}"?\n\nThis submits a single-document indexing job and resets the document indexing state. Continue?`,
+    );
+    if (!confirmed) return;
     setError("");
+    setReindexingDocumentId(document.id);
     try {
-      const job = await api.retryDocument(documentId);
+      const job = await api.retryDocument(document.id);
       setLastJobId(job.id);
+      setLastDocumentJob({ documentId: document.id, filename: document.filename, jobId: job.id });
       await Promise.all([loadDocuments(false), loadJobs()]);
-      onOpenJob?.(job.id);
+      if (openJobAfterSubmit) onOpenJob?.(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Retry indexing failed");
+    } finally {
+      setReindexingDocumentId(null);
     }
   }
 
@@ -353,9 +375,14 @@ export function KnowledgeBaseDetail({
         </div>
       )}
       {lastJobId && (
-        <p className="muted">
-          Index job submitted: {lastJobId}. You can view progress on the index jobs page.
-        </p>
+        <div className="notice">
+          Index job submitted: <strong>{lastJobId}</strong>. You can view progress on the index jobs page.
+          {onOpenJob && (
+            <button type="button" onClick={() => onOpenJob(lastJobId)}>
+              View job
+            </button>
+          )}
+        </div>
       )}
       {loading && <p className="muted">Loading documents...</p>}
       {isPolling && <p className="muted">Documents are processing. Auto-refresh is active.</p>}
@@ -414,8 +441,17 @@ export function KnowledgeBaseDetail({
                 <td>{new Date(document.created_at).toLocaleString()}</td>
                 <td className="actions">
                   <button type="button" onClick={() => openDocument(document)}>Details</button>
-                  {canEdit && ["failed", "uploaded"].includes(document.status) && (
-                    <button type="button" onClick={() => retry(document.id)}>Retry indexing</button>
+                  {canEdit && canRetryDocument(document) && (
+                    <button
+                      type="button"
+                      onClick={() => retry(document)}
+                      disabled={reindexingDocumentId === document.id}
+                    >
+                      {reindexingDocumentId === document.id ? "Submitting..." : "Reprocess"}
+                    </button>
+                  )}
+                  {canEdit && !canRetryDocument(document) && (
+                    <span className="action-note">{retryUnavailableReason(document)}</span>
                   )}
                   {canEdit && <button type="button" onClick={() => remove(document.id)}>Delete</button>}
                 </td>
@@ -468,6 +504,40 @@ export function KnowledgeBaseDetail({
             <dt>Formal metadata</dt>
             <dd><pre>{JSON.stringify(selectedDocument.meta || {}, null, 2)}</pre></dd>
           </dl>
+
+          {canEdit && (
+            <div className="subtle-block document-reindex-panel">
+              <div>
+                <h4>Single-document reprocess / reindex</h4>
+                <p className="muted">
+                  Use this for documents that are failed, uploaded, or parsed. CoreKB will submit a single-document index
+                  job and refresh document status while the worker processes it.
+                </p>
+                {!canRetryDocument(selectedDocument) && (
+                  <p className="muted">{retryUnavailableReason(selectedDocument)}</p>
+                )}
+                {lastDocumentJob?.documentId === selectedDocument.id && (
+                  <p className="notice">
+                    Submitted job <strong>{lastDocumentJob.jobId}</strong> for {lastDocumentJob.filename}.
+                  </p>
+                )}
+              </div>
+              <div className="actions">
+                <button
+                  type="button"
+                  disabled={!canRetryDocument(selectedDocument) || reindexingDocumentId === selectedDocument.id}
+                  onClick={() => retry(selectedDocument)}
+                >
+                  {reindexingDocumentId === selectedDocument.id ? "Submitting..." : "Reprocess document"}
+                </button>
+                {lastDocumentJob?.documentId === selectedDocument.id && onOpenJob && (
+                  <button type="button" onClick={() => onOpenJob(lastDocumentJob.jobId)}>
+                    View index job
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {isTableDocument(selectedDocument) && (
             <div className="subtle-block table-preview-block">
