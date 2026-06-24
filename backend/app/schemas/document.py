@@ -54,6 +54,10 @@ class DocumentMetadataSuggestionAcceptRequest(BaseModel):
     custom_value: bool = False
 
 
+class DocumentRetryIndexingRequest(BaseModel):
+    force: bool = False
+
+
 class DocumentMetadataSuggestionListResponse(BaseModel):
     items: list[DocumentMetadataSuggestionRead] = Field(default_factory=list)
     total: int

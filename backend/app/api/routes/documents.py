@@ -14,6 +14,7 @@ from app.schemas.document import (
     DocumentMetadataSuggestionAcceptRequest,
     DocumentMetadataSuggestionListResponse,
     DocumentMetadataSuggestionRead,
+    DocumentRetryIndexingRequest,
     DocumentRead,
     TablePreviewResponse,
     ValidationReportSuggestionBridgeResponse,
@@ -538,16 +539,27 @@ async def retry_indexing(
     document_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    payload: DocumentRetryIndexingRequest | None = None,
 ) -> IndexJobSummary:
     document = db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     kb = get_kb_or_404(db, document.knowledge_base_id)
     assert_can_edit_kb(db, current_user, kb)
-    if document.status.value not in {"failed", "uploaded", "parsed"}:
+    force = bool(payload.force) if payload else False
+    previous_status = document.status.value
+    allowed_statuses = {"failed", "uploaded", "parsed"}
+    if force:
+        allowed_statuses.add("indexed")
+    if document.status.value not in allowed_statuses:
+        detail = (
+            "Only failed, uploaded, parsed, or force-indexed documents can be retried"
+            if force
+            else "Only failed, uploaded, or parsed documents can be retried"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only failed, uploaded, or parsed documents can be retried",
+            detail=detail,
         )
     document.status = DocumentStatus.uploaded
     document.error_message = None
@@ -566,5 +578,6 @@ async def retry_indexing(
         knowledge_base_id=document.knowledge_base_id,
         document_id=document.id,
         status="success",
+        metadata={"force": force, "previous_status": previous_status},
     )
     return job

@@ -2,6 +2,7 @@ from io import BytesIO
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 from starlette.datastructures import UploadFile
 
 from app.api.routes.documents import delete_document, retry_indexing, upload_document
@@ -9,6 +10,7 @@ from app.models.document import Document, DocumentChunk, DocumentStatus
 from app.models.index_job import IndexJob, IndexJobType
 from app.models.knowledge_base import KBPermission, KBPermissionRole, KnowledgeBase
 from app.models.user import User
+from app.schemas.document import DocumentRetryIndexingRequest
 from app.services.document_ingestion import DocumentIngestionService
 from app.services.document_parser import ParsedSection
 
@@ -157,6 +159,45 @@ async def test_retry_indexing_clears_and_enqueues(db_session, tmp_path, monkeypa
     assert result.job_type == IndexJobType.document_index
     assert result.document_id == document.id
     assert enqueued == [result.id]
+
+
+@pytest.mark.asyncio
+async def test_retry_indexing_rejects_indexed_without_force(db_session, tmp_path, monkeypatch) -> None:
+    owner, kb = make_owner_and_kb(db_session)
+    path = tmp_path / "indexed.txt"
+    path.write_text("hello", encoding="utf-8")
+    document = make_document(db_session, kb, path, DocumentStatus.indexed)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await retry_indexing(document.id, owner, db_session)
+
+    assert getattr(exc_info.value, "status_code", None) == 400
+    assert "Only failed, uploaded, or parsed documents can be retried" in getattr(exc_info.value, "detail", "")
+
+
+@pytest.mark.asyncio
+async def test_retry_indexing_force_allows_indexed_document(db_session, tmp_path, monkeypatch) -> None:
+    owner, kb = make_owner_and_kb(db_session)
+    path = tmp_path / "indexed.txt"
+    path.write_text("hello", encoding="utf-8")
+    document = make_document(db_session, kb, path, DocumentStatus.indexed)
+    enqueued = []
+
+    monkeypatch.setattr("app.api.routes.documents.enqueue_reindex_job", lambda job_id: enqueued.append(job_id))
+
+    result = await retry_indexing(
+        document.id,
+        owner,
+        db_session,
+        DocumentRetryIndexingRequest(force=True),
+    )
+    refreshed = db_session.get(Document, document.id)
+
+    assert result.job_type == IndexJobType.document_index
+    assert result.document_id == document.id
+    assert enqueued == [result.id]
+    assert refreshed.status == DocumentStatus.uploaded
+    assert refreshed.indexed_at is None
 
 
 @pytest.mark.asyncio

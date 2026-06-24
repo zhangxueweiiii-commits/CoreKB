@@ -243,8 +243,11 @@ export const api = {
   },
   deleteDocument: (documentId: string) =>
     request<void>(`/documents/${documentId}`, { method: "DELETE" }),
-  retryDocument: (documentId: string) =>
-    request<RetryIndexingResponse>(`/documents/${documentId}/retry-indexing`, { method: "POST" }),
+  retryDocument: (documentId: string, force = false) =>
+    request<RetryIndexingResponse>(`/documents/${documentId}/retry-indexing`, {
+      method: "POST",
+      body: JSON.stringify({ force }),
+    }),
   generateMetadataSuggestions: (documentId: string) =>
     request<DocumentMetadataSuggestionList>(`/documents/${documentId}/metadata-suggestions/generate`, { method: "POST" }),
   metadataSuggestions: (documentId: string) =>
