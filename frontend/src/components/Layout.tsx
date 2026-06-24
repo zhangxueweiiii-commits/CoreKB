@@ -15,6 +15,7 @@ export function Layout({ user, active, onNavigate, onLogout, children }: LayoutP
     ["search", "Search"],
     ["chat", "Chat"],
     ["assistants", "Assistants"],
+    ["maintenanceKnowledge", "Maintenance"],
     ["indexJobs", "Index Jobs"],
     ...(user.role === "admin"
       ? [

@@ -668,3 +668,50 @@ blockquote {
   padding: 12px;
   white-space: pre-wrap;
 }
+
+.maintenance-workspace {
+  max-width: 1180px;
+}
+
+.maintenance-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(320px, 1fr) minmax(260px, 340px);
+}
+
+.maintenance-query-panel,
+.maintenance-side-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.maintenance-side-panel {
+  background: #f8fbfc;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.maintenance-side-panel h3 {
+  margin: 0;
+}
+
+.quick-query-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-query-list button {
+  text-align: left;
+}
+
+.maintenance-answer {
+  max-width: 980px;
+}
+
+@media (max-width: 980px) {
+  .maintenance-grid {
+    grid-template-columns: 1fr;
+  }
+}
