@@ -32,6 +32,7 @@ const statusLabels: Record<string, string> = {
 
 const processingStatuses = new Set(["uploaded", "parsing", "chunking", "embedding"]);
 const retryableStatuses = new Set(["failed", "uploaded", "parsed"]);
+const forceRetryableStatuses = new Set(["indexed"]);
 const tableFileTypes = new Set(["csv", "xlsx", "xls"]);
 
 function formatBytes(size: number) {
@@ -44,10 +45,18 @@ function canRetryDocument(document: DocumentItem) {
   return retryableStatuses.has(document.status);
 }
 
+function canForceRetryDocument(document: DocumentItem) {
+  return forceRetryableStatuses.has(document.status);
+}
+
 function retryUnavailableReason(document: DocumentItem) {
   if (processingStatuses.has(document.status)) return "This document is already being processed.";
-  if (document.status === "indexed") return "Indexed documents are not eligible for retry; use knowledge-base reindex if needed.";
   return "Only failed, uploaded, or parsed documents can be retried.";
+}
+
+function retryButtonLabel(document: DocumentItem) {
+  if (canForceRetryDocument(document)) return "Force reprocess";
+  return "Reprocess";
 }
 
 export function KnowledgeBaseDetail({
@@ -245,14 +254,17 @@ export function KnowledgeBaseDetail({
   }
 
   async function retry(document: DocumentItem, openJobAfterSubmit = false) {
+    const force = canForceRetryDocument(document);
     const confirmed = window.confirm(
-      `Reprocess and reindex "${document.filename}"?\n\nThis submits a single-document indexing job and resets the document indexing state. Continue?`,
+      force
+        ? `Force reprocess and reindex "${document.filename}"?\n\nThis indexed document will be reset and submitted as a single-document indexing job. Existing chunks and vectors will be replaced by the indexing worker. Continue?`
+        : `Reprocess and reindex "${document.filename}"?\n\nThis submits a single-document indexing job and resets the document indexing state. Continue?`,
     );
     if (!confirmed) return;
     setError("");
     setReindexingDocumentId(document.id);
     try {
-      const job = await api.retryDocument(document.id);
+      const job = await api.retryDocument(document.id, force);
       setLastJobId(job.id);
       setLastDocumentJob({ documentId: document.id, filename: document.filename, jobId: job.id });
       await Promise.all([loadDocuments(false), loadJobs()]);
@@ -441,16 +453,16 @@ export function KnowledgeBaseDetail({
                 <td>{new Date(document.created_at).toLocaleString()}</td>
                 <td className="actions">
                   <button type="button" onClick={() => openDocument(document)}>Details</button>
-                  {canEdit && canRetryDocument(document) && (
+                  {canEdit && (canRetryDocument(document) || canForceRetryDocument(document)) && (
                     <button
                       type="button"
                       onClick={() => retry(document)}
                       disabled={reindexingDocumentId === document.id}
                     >
-                      {reindexingDocumentId === document.id ? "Submitting..." : "Reprocess"}
+                      {reindexingDocumentId === document.id ? "Submitting..." : retryButtonLabel(document)}
                     </button>
                   )}
-                  {canEdit && !canRetryDocument(document) && (
+                  {canEdit && !canRetryDocument(document) && !canForceRetryDocument(document) && (
                     <span className="action-note">{retryUnavailableReason(document)}</span>
                   )}
                   {canEdit && <button type="button" onClick={() => remove(document.id)}>Delete</button>}
@@ -510,10 +522,17 @@ export function KnowledgeBaseDetail({
               <div>
                 <h4>Single-document reprocess / reindex</h4>
                 <p className="muted">
-                  Use this for documents that are failed, uploaded, or parsed. CoreKB will submit a single-document index
-                  job and refresh document status while the worker processes it.
+                  Use this for documents that are failed, uploaded, parsed, or indexed. Indexed documents require an
+                  explicit force action. CoreKB will submit a single-document index job and refresh document status while
+                  the worker processes it.
                 </p>
-                {!canRetryDocument(selectedDocument) && (
+                {canForceRetryDocument(selectedDocument) && (
+                  <p className="notice">
+                    This document is already indexed. Force reprocess will reset its indexing state and replace chunks
+                    and vectors through the normal worker pipeline.
+                  </p>
+                )}
+                {!canRetryDocument(selectedDocument) && !canForceRetryDocument(selectedDocument) && (
                   <p className="muted">{retryUnavailableReason(selectedDocument)}</p>
                 )}
                 {lastDocumentJob?.documentId === selectedDocument.id && (
@@ -525,10 +544,13 @@ export function KnowledgeBaseDetail({
               <div className="actions">
                 <button
                   type="button"
-                  disabled={!canRetryDocument(selectedDocument) || reindexingDocumentId === selectedDocument.id}
+                  disabled={
+                    (!canRetryDocument(selectedDocument) && !canForceRetryDocument(selectedDocument)) ||
+                    reindexingDocumentId === selectedDocument.id
+                  }
                   onClick={() => retry(selectedDocument)}
                 >
-                  {reindexingDocumentId === selectedDocument.id ? "Submitting..." : "Reprocess document"}
+                  {reindexingDocumentId === selectedDocument.id ? "Submitting..." : `${retryButtonLabel(selectedDocument)} document`}
                 </button>
                 {lastDocumentJob?.documentId === selectedDocument.id && onOpenJob && (
                   <button type="button" onClick={() => onOpenJob(lastDocumentJob.jobId)}>
