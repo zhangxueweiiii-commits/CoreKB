@@ -173,6 +173,22 @@ export interface AssistantChatResponse {
   sources: Array<{ filename: string; page_number?: number; section_title?: string; sheet_name?: string; row_start?: number; row_end?: number; quote: string; chunk_id: string }>;
   no_answer_detected: boolean;
   conversation_id: string;
+  retrieved_results?: Array<{
+    rank?: number;
+    document_id?: string;
+    document_name?: string;
+    filename?: string;
+    chunk_id?: string;
+    chunk_excerpt?: string;
+    chunk_text?: string;
+    vector_score?: number | null;
+    rerank_score?: number | null;
+    final_score?: number | null;
+    score?: number | null;
+    chunk_metadata?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    citation?: Record<string, unknown>;
+  }>;
 }
 
 export interface RetryIndexingResponse {

@@ -15,6 +15,7 @@ import { IndexJobDetailPage } from "./pages/IndexJobDetailPage";
 import { IndexJobsPage } from "./pages/IndexJobsPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { LoginPage } from "./pages/LoginPage";
+import { MaintenanceKnowledgePage } from "./pages/MaintenanceKnowledgePage";
 import { MetadataDictionaryPage } from "./pages/MetadataDictionaryPage";
 import { MetadataPrecheckPage } from "./pages/MetadataPrecheckPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -103,6 +104,7 @@ export function App() {
       {active === "search" && <SearchPage />}
       {active === "chat" && <ChatPage />}
       {active === "assistants" && <AssistantsPage />}
+      {active === "maintenanceKnowledge" && <MaintenanceKnowledgePage />}
       {active === "evaluationDashboard" && <EvaluationDashboardPage onOpenEvaluation={() => setActive("evaluation")} />}
       {active === "evaluationFailureTriage" && (
         <EvaluationFailureTriagePage
