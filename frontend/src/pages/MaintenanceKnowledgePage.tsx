@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type AssistantChatResponse } from "../api/client";
 
 const QUICK_QUERIES = [
@@ -18,12 +18,61 @@ function citationLabel(item: AssistantChatResponse["citations"][number]) {
   return `${item.filename}${page}${section}`;
 }
 
+type EvidenceResult = NonNullable<AssistantChatResponse["retrieved_results"]>[number];
+type Citation = AssistantChatResponse["citations"][number];
+
+const METADATA_LABELS: Record<string, string> = {
+  category: "Category",
+  doc_type: "Doc type",
+  equipment_model: "Equipment",
+  fault_code: "Fault code",
+  process_name: "Process",
+  sop_code: "SOP",
+  version: "Version",
+  sheet_name: "Sheet",
+  row_start: "Row start",
+  row_end: "Row end",
+};
+
 function scoreText(value?: number | null) {
   return typeof value === "number" ? value.toFixed(3) : "-";
 }
 
-function resultTitle(result: NonNullable<AssistantChatResponse["retrieved_results"]>[number], index: number) {
+function resultKey(result: EvidenceResult, index: number) {
+  return result.chunk_id || `${result.document_id || "document"}-${result.rank || index + 1}`;
+}
+
+function resultTitle(result: EvidenceResult, index: number) {
   return result.document_name || result.filename || result.citation?.filename?.toString() || `Evidence #${index + 1}`;
+}
+
+function resultExcerpt(result: EvidenceResult) {
+  return result.chunk_excerpt || result.chunk_text || "";
+}
+
+function resultMetadata(result: EvidenceResult) {
+  return result.chunk_metadata || result.metadata || {};
+}
+
+function evidenceCitation(result: EvidenceResult, citations: Citation[]) {
+  if (!result.chunk_id) return null;
+  return citations.find((item) => item.chunk_id === result.chunk_id) ?? null;
+}
+
+function evidenceCitationLabel(result: EvidenceResult, citation: Citation | null, index: number) {
+  if (citation) return citationLabel(citation);
+  const rawCitation = result.citation || {};
+  const filename = rawCitation.filename?.toString() || resultTitle(result, index);
+  const sheet = rawCitation.sheet_name?.toString();
+  const page = rawCitation.page_number ? ` / p.${rawCitation.page_number}` : "";
+  const rows = rawCitation.row_start && rawCitation.row_end ? ` / Rows ${rawCitation.row_start}-${rawCitation.row_end}` : "";
+  return sheet ? `${filename} / Sheet: ${sheet}${rows}` : `${filename}${page}`;
+}
+
+function visibleMetadataEntries(metadata: Record<string, unknown>) {
+  return Object.entries(metadata)
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .slice(0, 12);
 }
 
 export function MaintenanceKnowledgePage() {
@@ -34,6 +83,8 @@ export function MaintenanceKnowledgePage() {
   const [response, setResponse] = useState<AssistantChatResponse | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
+  const [citedOnly, setCitedOnly] = useState(false);
+  const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
 
   const metadataFilter = useMemo(() => {
     const filter: Record<string, string> = { category: "maintenance" };
@@ -51,6 +102,19 @@ export function MaintenanceKnowledgePage() {
     ].filter(Boolean);
     return parts.join("\n");
   }, [equipmentModel, faultCode, notes, symptom]);
+
+  const evidenceResults = useMemo(() => response?.retrieved_results ?? [], [response]);
+  const citedChunkIds = useMemo(() => new Set(response?.citations.map((item) => item.chunk_id) ?? []), [response]);
+  const visibleEvidence = useMemo(
+    () => evidenceResults.filter((result) => !citedOnly || (result.chunk_id && citedChunkIds.has(result.chunk_id))),
+    [citedChunkIds, citedOnly, evidenceResults],
+  );
+  const selectedEvidence = visibleEvidence.find((result, index) => resultKey(result, index) === selectedEvidenceKey) ?? visibleEvidence[0];
+
+  useEffect(() => {
+    setCitedOnly(false);
+    setSelectedEvidenceKey(evidenceResults[0] ? resultKey(evidenceResults[0], 0) : null);
+  }, [evidenceResults]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -162,25 +226,108 @@ export function MaintenanceKnowledgePage() {
             </div>
           )}
 
-          {response.retrieved_results && response.retrieved_results.length > 0 && (
-            <div className="subtle-block">
-              <h3>Top evidence</h3>
-              <div className="search-result-list">
-                {response.retrieved_results.slice(0, 5).map((result, index) => (
-                  <article key={`${result.chunk_id || index}`} className="search-result-card">
-                    <div className="search-result-header">
-                      <span className="status-pill status-info">#{result.rank || index + 1}</span>
-                      <div className="score-strip">
-                        <span>final {scoreText(result.final_score ?? result.score)}</span>
-                        <span>vector {scoreText(result.vector_score)}</span>
-                        <span>rerank {scoreText(result.rerank_score)}</span>
-                      </div>
-                    </div>
-                    <h4>{resultTitle(result, index)}</h4>
-                    <pre className="search-result-snippet">{result.chunk_excerpt || result.chunk_text || ""}</pre>
-                  </article>
-                ))}
+          {evidenceResults.length > 0 && (
+            <div className="subtle-block maintenance-evidence-panel">
+              <div className="section-heading">
+                <div>
+                  <h3>Evidence panel</h3>
+                  <p className="muted">
+                    Inspect retrieved chunks, citations, scores, and metadata used by this maintenance answer.
+                  </p>
+                </div>
+                <label className="inline-toggle">
+                  <input type="checkbox" checked={citedOnly} onChange={(event) => setCitedOnly(event.target.checked)} />
+                  Cited only
+                </label>
               </div>
+
+              {visibleEvidence.length === 0 ? (
+                <p className="empty-state">No retrieved evidence is cited in this answer.</p>
+              ) : (
+                <div className="evidence-layout">
+                  <div className="evidence-list" aria-label="Retrieved evidence">
+                    {visibleEvidence.map((result, index) => {
+                      const key = resultKey(result, index);
+                      const citation = evidenceCitation(result, response.citations);
+                      const isSelected = selectedEvidence === result;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`evidence-list-item${isSelected ? " active" : ""}`}
+                          onClick={() => setSelectedEvidenceKey(key)}
+                        >
+                          <span className="status-pill status-info">#{result.rank || index + 1}</span>
+                          <span className="evidence-list-main">
+                            <strong>{resultTitle(result, index)}</strong>
+                            <small>{evidenceCitationLabel(result, citation, index)}</small>
+                          </span>
+                          <span className={citation ? "status-pill status-indexed" : "status-pill status-warning"}>
+                            {citation ? "Cited" : "Not cited"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedEvidence && (
+                    <article className="evidence-detail">
+                      {(() => {
+                        const selectedIndex = visibleEvidence.indexOf(selectedEvidence);
+                        const citation = evidenceCitation(selectedEvidence, response.citations);
+                        const metadata = resultMetadata(selectedEvidence);
+                        const metadataEntries = visibleMetadataEntries(metadata);
+                        return (
+                          <>
+                            <div className="search-result-header">
+                              <span className="status-pill status-info">Rank #{selectedEvidence.rank || selectedIndex + 1}</span>
+                              <span className={citation ? "status-pill status-indexed" : "status-pill status-warning"}>
+                                {citation ? "Cited in answer" : "Retrieved, not cited"}
+                              </span>
+                            </div>
+                            <h4>{resultTitle(selectedEvidence, selectedIndex)}</h4>
+                            <p className="muted">{evidenceCitationLabel(selectedEvidence, citation, selectedIndex)}</p>
+
+                            <div className="score-grid">
+                              <span>
+                                <strong>{scoreText(selectedEvidence.final_score ?? selectedEvidence.score)}</strong>
+                                Final
+                              </span>
+                              <span>
+                                <strong>{scoreText(selectedEvidence.vector_score)}</strong>
+                                Vector
+                              </span>
+                              <span>
+                                <strong>{scoreText(selectedEvidence.rerank_score)}</strong>
+                                Rerank
+                              </span>
+                            </div>
+
+                            {metadataEntries.length > 0 && (
+                              <div className="metadata-chip-list">
+                                {metadataEntries.map(([key, value]) => (
+                                  <span key={key} className="metadata-chip">
+                                    {METADATA_LABELS[key] || key}: {String(value)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {citation?.quote && (
+                              <blockquote className="evidence-quote">
+                                <strong>Answer citation</strong>
+                                <p>{citation.quote}</p>
+                              </blockquote>
+                            )}
+
+                            <pre className="search-result-snippet evidence-snippet">{resultExcerpt(selectedEvidence)}</pre>
+                          </>
+                        );
+                      })()}
+                    </article>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

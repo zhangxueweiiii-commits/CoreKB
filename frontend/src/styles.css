@@ -710,8 +710,147 @@ blockquote {
   max-width: 980px;
 }
 
+.maintenance-evidence-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.inline-toggle {
+  align-items: center;
+  display: inline-flex;
+  flex-direction: row;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.inline-toggle input {
+  width: auto;
+}
+
+.evidence-layout {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+}
+
+.evidence-list {
+  border: 1px solid #e3e9ed;
+  border-radius: 8px;
+  display: grid;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.evidence-list-item {
+  align-items: center;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e3e9ed;
+  color: #172026;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 12px;
+  text-align: left;
+}
+
+.evidence-list-item:last-child {
+  border-bottom: 0;
+}
+
+.evidence-list-item.active,
+.evidence-list-item:hover {
+  background: #f4f9fb;
+}
+
+.evidence-list-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.evidence-list-main strong,
+.evidence-list-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-list-main small {
+  color: #63747d;
+}
+
+.evidence-detail {
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.score-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.score-grid span {
+  background: #f8fbfc;
+  border: 1px solid #e3e9ed;
+  border-radius: 6px;
+  color: #63747d;
+  display: grid;
+  font-size: 13px;
+  gap: 4px;
+  padding: 10px;
+}
+
+.score-grid strong {
+  color: #172026;
+  font-size: 16px;
+}
+
+.metadata-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metadata-chip {
+  background: #eef5f7;
+  border: 1px solid #dfe7eb;
+  border-radius: 999px;
+  color: #31444d;
+  font-size: 13px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 5px 9px;
+}
+
+.evidence-quote {
+  background: #f8fbfc;
+  border-left: 3px solid #7aa7b4;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.evidence-quote p {
+  margin-bottom: 0;
+}
+
+.evidence-snippet {
+  max-height: 340px;
+}
+
 @media (max-width: 980px) {
   .maintenance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .evidence-layout {
     grid-template-columns: 1fr;
   }
 }
