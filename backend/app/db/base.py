@@ -10,6 +10,7 @@ from app.models.evaluation_regression import EvaluationRegression
 from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.models.index_job import IndexJob, IndexJobItem
 from app.models.knowledge_base import KnowledgeBase, KBPermission
+from app.models.maintenance import MaintenanceExperienceCandidate, MaintenanceKnowledgeEntry, MaintenanceRecordDraft
 from app.models.metadata_dictionary import MetadataDictionaryEntry
 from app.models.retrieval_log import RetrievalLog
 from app.models.user import User
@@ -34,6 +35,9 @@ __all__ = [
     "IndexJobItem",
     "KnowledgeBase",
     "KBPermission",
+    "MaintenanceExperienceCandidate",
+    "MaintenanceKnowledgeEntry",
+    "MaintenanceRecordDraft",
     "MetadataDictionaryEntry",
     "Message",
     "RetrievalLog",

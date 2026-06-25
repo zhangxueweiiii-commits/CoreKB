@@ -1,8 +1,8 @@
-# Maintenance Knowledge MVP
+# Maintenance Knowledge Curation
 
 ## Purpose
 
-The Maintenance Knowledge MVP is a lightweight workspace for equipment fault lookup and repair guidance. It wraps the existing CoreKB maintenance assistant and does not introduce a new backend workflow engine.
+The Maintenance Knowledge workspace supports equipment fault lookup, evidence review, controlled record drafting, and human-reviewed maintenance knowledge curation. It wraps the existing CoreKB maintenance assistant and keeps the workflow explicit and auditable.
 
 ## Behavior
 
@@ -46,8 +46,9 @@ The UI displays:
 - rerank status
 - no-answer state
 - evidence panel when retrieved evidence is returned by the API
-- maintenance record draft for copy/paste review
-- maintenance experience candidate for knowledge curation review
+- maintenance record draft save/copy workflow
+- maintenance experience candidate save/review workflow
+- pending candidate review and accept/reject actions
 
 ## Evidence Panel
 
@@ -83,7 +84,13 @@ The draft includes:
 - top retrieved evidence summaries
 - an operator confirmation checklist
 
-The draft is intended for copy/paste into an existing reviewed maintenance process. It is not persisted by CoreKB and must be reviewed by a human before use.
+The draft is intended for review in an existing maintenance process. It can be saved in CoreKB as a `maintenance_record_drafts` record, but it is not a work order and is not sent to ERP, MES, OA, CMMS, or ticket systems.
+
+Saving a draft records an audit event:
+
+```text
+maintenance.record_draft.create
+```
 
 ## Maintenance Experience Candidate
 
@@ -101,7 +108,40 @@ The candidate includes:
 - supporting evidence
 - curation checks
 
-This is a drafting aid for future knowledge curation. It is explicitly marked as unreviewed and not approved knowledge. A maintenance owner must review the source citations, applicability, and safety constraints before the content is added to any formal knowledge base.
+This is a drafting aid for future knowledge curation. It is explicitly marked as pending and not approved knowledge. A maintenance owner or reviewer must review the source citations, applicability, and safety constraints before accepting it.
+
+Saving a candidate creates a pending `maintenance_experience_candidates` record and records an audit event:
+
+```text
+maintenance.experience_candidate.create
+```
+
+## Candidate Review
+
+Pending candidates can be explicitly accepted or rejected.
+
+Rejecting a candidate:
+
+- keeps the candidate stored for audit/history
+- records reviewer note, reviewer, and review time
+- does not create a knowledge entry
+
+Accepting a candidate:
+
+- records reviewer note, reviewer, and review time
+- creates a controlled `maintenance_knowledge_entries` record
+- sets the knowledge entry status to `active`
+- links the entry to the source candidate
+
+Review actions record audit events:
+
+```text
+maintenance.experience_candidate.accept
+maintenance.experience_candidate.reject
+maintenance.knowledge_entry.create
+```
+
+Accepted entries do not overwrite manuals, SOPs, source documents, or document metadata. This first version does not automatically index accepted entries; indexing can be added later as a normal single-entry indexing path with its own audit and tests.
 
 ## Boundaries
 
@@ -117,10 +157,11 @@ This MVP does not:
 - trigger reindexing
 - change prompts or rerank configuration dynamically
 - persist evidence inspection state
-- persist maintenance record drafts
-- persist maintenance experience candidates
 - create work orders or repair tickets
 - update source documents or formal knowledge entries
+- automatically accept candidates
+- batch process candidates
+- batch reindex
 
 It is a focused UI wrapper around existing RAG, metadata filter, rerank, and citation behavior.
 
