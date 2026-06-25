@@ -45,7 +45,25 @@ The UI displays:
 - used metadata filter
 - rerank status
 - no-answer state
-- top retrieved evidence when returned by the API
+- evidence panel when retrieved evidence is returned by the API
+
+## Evidence Panel
+
+The evidence panel is a read-only inspection area for the retrieval context already returned by the existing assistant chat API.
+
+It displays:
+
+- retrieved evidence rank
+- source document or citation label
+- whether the chunk was cited in the answer
+- final, vector, and rerank scores when available
+- chunk metadata such as category, equipment model, fault code, sheet, and row range
+- answer citation quote when the retrieved chunk was cited
+- retrieved chunk excerpt
+
+Users can enable a cited-only view to focus on evidence that was actually referenced by the assistant answer.
+
+The evidence panel does not rerun search, rerank, or chat. It does not persist evidence inspection state. It only renders response data returned by the existing assistant endpoint.
 
 ## Boundaries
 
@@ -60,6 +78,7 @@ This MVP does not:
 - create metadata suggestions
 - trigger reindexing
 - change prompts or rerank configuration dynamically
+- persist evidence inspection state
 
 It is a focused UI wrapper around existing RAG, metadata filter, rerank, and citation behavior.
 
