@@ -98,6 +98,39 @@ class MaintenanceCurationService:
             stmt = stmt.where(MaintenanceExperienceCandidate.status == MaintenanceExperienceCandidateStatus(status_filter))
         return list(self.db.scalars(stmt).all())
 
+    def list_knowledge_entries(self) -> list[MaintenanceKnowledgeEntry]:
+        stmt = (
+            select(MaintenanceKnowledgeEntry)
+            .where(MaintenanceKnowledgeEntry.status == MaintenanceKnowledgeEntryStatus.active)
+            .order_by(MaintenanceKnowledgeEntry.created_at.desc())
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def search_knowledge_entries(
+        self,
+        *,
+        query: str | None = None,
+        equipment_model: str | None = None,
+        fault_code: str | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        entries = self.list_knowledge_entries()
+        normalized_equipment = _normalize_match_value(equipment_model)
+        normalized_fault = _normalize_match_value(fault_code)
+        terms = _query_terms(query)
+        results: list[dict] = []
+        for entry in entries:
+            if normalized_equipment and _normalize_match_value(entry.equipment_model) != normalized_equipment:
+                continue
+            if normalized_fault and _normalize_match_value(entry.fault_code) != normalized_fault:
+                continue
+            score, matched_fields = _score_entry(entry, terms, normalized_equipment, normalized_fault)
+            if terms and score <= 0:
+                continue
+            results.append({"entry": entry, "score": score, "matched_fields": matched_fields})
+        results.sort(key=lambda item: (item["score"], item["entry"].created_at), reverse=True)
+        return results[:limit]
+
     def accept_candidate(self, candidate_id: UUID, actor: User, reviewer_note: str | None = None) -> tuple[MaintenanceExperienceCandidate, MaintenanceKnowledgeEntry]:
         candidate = self._candidate_or_404(candidate_id)
         if candidate.status != MaintenanceExperienceCandidateStatus.pending:
@@ -180,3 +213,48 @@ def _clean(value: str | None) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def _normalize_match_value(value: str | None) -> str | None:
+    cleaned = _clean(value)
+    return cleaned.upper() if cleaned else None
+
+
+def _query_terms(query: str | None) -> list[str]:
+    cleaned = _clean(query)
+    if not cleaned:
+        return []
+    return [term for term in cleaned.lower().replace("-", " ").split() if len(term) >= 2]
+
+
+def _score_entry(
+    entry: MaintenanceKnowledgeEntry,
+    terms: list[str],
+    equipment_model: str | None,
+    fault_code: str | None,
+) -> tuple[float, list[str]]:
+    score = 0.0
+    matched_fields: set[str] = set()
+    if equipment_model and _normalize_match_value(entry.equipment_model) == equipment_model:
+        score += 3.0
+        matched_fields.add("equipment_model")
+    if fault_code and _normalize_match_value(entry.fault_code) == fault_code:
+        score += 3.0
+        matched_fields.add("fault_code")
+    field_weights = {
+        "title": 2.0,
+        "fault_symptom": 1.5,
+        "root_cause": 1.5,
+        "solution": 1.5,
+        "spare_parts": 1.0,
+    }
+    for field, weight in field_weights.items():
+        value = getattr(entry, field) or ""
+        lowered = value.lower()
+        hits = sum(1 for term in terms if term in lowered)
+        if hits:
+            score += hits * weight
+            matched_fields.add(field)
+    if not terms and score == 0:
+        score = 1.0
+    return score, sorted(matched_fields)

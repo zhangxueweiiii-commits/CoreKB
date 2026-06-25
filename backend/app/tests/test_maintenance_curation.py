@@ -145,3 +145,49 @@ def test_curation_does_not_modify_source_document_metadata_or_trigger_batch_rein
     assert document.status == DocumentStatus.indexed
     assert db_session.query(IndexJob).count() == 0
     assert db_session.query(MaintenanceExperienceCandidate).count() == 1
+
+
+def test_search_returns_active_accepted_knowledge_entries(db_session):
+    user = make_user(db_session, "maintenance-search-user")
+    service = MaintenanceCurationService(db_session)
+    candidate = service.create_candidate(candidate_payload(), user)
+    service.accept_candidate(candidate.id, user, "Approved")
+
+    results = service.search_knowledge_entries(query="sensor wiring", equipment_model="A200", fault_code="E12")
+
+    assert len(results) == 1
+    assert results[0]["entry"].title == "A200 E12 handling"
+    assert results[0]["score"] > 0
+    assert "equipment_model" in results[0]["matched_fields"]
+    assert "fault_code" in results[0]["matched_fields"]
+    assert "solution" in results[0]["matched_fields"]
+
+
+def test_search_filters_by_equipment_and_fault_code(db_session):
+    user = make_user(db_session, "maintenance-search-filter-user")
+    service = MaintenanceCurationService(db_session)
+    first = service.create_candidate(candidate_payload(), user)
+    service.accept_candidate(first.id, user, "Approved")
+    other_payload = candidate_payload()
+    other_payload.title = "B300 F03 handling"
+    other_payload.equipment_model = "B300"
+    other_payload.fault_code = "F03"
+    other_payload.fault_symptom = "Pressure alarm"
+    other_payload.effective_handling_method = "Check pressure switch."
+    second = service.create_candidate(other_payload, user)
+    service.accept_candidate(second.id, user, "Approved")
+
+    results = service.search_knowledge_entries(query="check", equipment_model="A200", fault_code="E12")
+
+    assert [item["entry"].equipment_model for item in results] == ["A200"]
+
+
+def test_rejected_candidate_is_not_searchable(db_session):
+    user = make_user(db_session, "maintenance-search-reject-user")
+    service = MaintenanceCurationService(db_session)
+    candidate = service.create_candidate(candidate_payload(), user)
+    service.reject_candidate(candidate.id, user, "Rejected")
+
+    results = service.search_knowledge_entries(query="sensor", equipment_model="A200", fault_code="E12")
+
+    assert results == []

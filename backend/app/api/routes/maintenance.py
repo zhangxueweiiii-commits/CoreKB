@@ -13,6 +13,7 @@ from app.schemas.maintenance import (
     MaintenanceExperienceCandidateCreate,
     MaintenanceExperienceCandidateRead,
     MaintenanceKnowledgeEntryRead,
+    MaintenanceKnowledgeSearchResponse,
     MaintenanceRecordDraftCreate,
     MaintenanceRecordDraftRead,
 )
@@ -56,6 +57,39 @@ def list_maintenance_experience_candidates(
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid candidate status") from exc
     return MaintenanceCurationService(db).list_candidates(status_filter)
+
+
+@router.get("/knowledge-entries", response_model=list[MaintenanceKnowledgeEntryRead])
+def list_maintenance_knowledge_entries(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return MaintenanceCurationService(db).list_knowledge_entries()
+
+
+@router.get("/knowledge-search", response_model=MaintenanceKnowledgeSearchResponse)
+def search_maintenance_knowledge_entries(
+    query: str | None = None,
+    equipment_model: str | None = None,
+    fault_code: str | None = None,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    safe_limit = max(1, min(limit, 50))
+    items = MaintenanceCurationService(db).search_knowledge_entries(
+        query=query,
+        equipment_model=equipment_model,
+        fault_code=fault_code,
+        limit=safe_limit,
+    )
+    return {
+        "query": query,
+        "equipment_model": equipment_model,
+        "fault_code": fault_code,
+        "total": len(items),
+        "items": items,
+    }
 
 
 @router.post("/experience-candidates/{candidate_id}/accept", response_model=MaintenanceCandidateAcceptResponse)

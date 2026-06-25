@@ -872,6 +872,24 @@ blockquote {
   gap: 14px;
 }
 
+.maintenance-knowledge-search {
+  display: grid;
+  gap: 14px;
+}
+
+.knowledge-entry-list {
+  display: grid;
+  gap: 14px;
+}
+
+.knowledge-entry-card {
+  border: 1px solid #d9e8dd;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
 .candidate-review-list {
   display: grid;
   gap: 14px;

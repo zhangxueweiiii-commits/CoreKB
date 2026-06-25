@@ -103,3 +103,17 @@ class MaintenanceKnowledgeEntryRead(BaseModel):
 class MaintenanceCandidateAcceptResponse(BaseModel):
     candidate: MaintenanceExperienceCandidateRead
     knowledge_entry: MaintenanceKnowledgeEntryRead
+
+
+class MaintenanceKnowledgeSearchResult(BaseModel):
+    entry: MaintenanceKnowledgeEntryRead
+    score: float
+    matched_fields: list[str] = Field(default_factory=list)
+
+
+class MaintenanceKnowledgeSearchResponse(BaseModel):
+    query: str | None = None
+    equipment_model: str | None = None
+    fault_code: str | None = None
+    total: int
+    items: list[MaintenanceKnowledgeSearchResult] = Field(default_factory=list)
