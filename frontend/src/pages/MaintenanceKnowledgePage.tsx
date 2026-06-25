@@ -146,6 +146,65 @@ function buildMaintenanceRecordDraft(params: {
   ].join("\n");
 }
 
+function buildMaintenanceExperienceCandidate(params: {
+  equipmentModel: string;
+  faultCode: string;
+  symptom: string;
+  response: AssistantChatResponse;
+  evidenceResults: EvidenceResult[];
+}) {
+  const { equipmentModel, faultCode, symptom, response, evidenceResults } = params;
+  const titleParts = [
+    equipmentModel.trim() || "Unknown equipment",
+    faultCode.trim() ? `fault ${faultCode.trim()}` : "maintenance case",
+  ];
+  const evidence = evidenceResults
+    .slice(0, 3)
+    .map((item, index) => {
+      const citation = response.citations.find((source) => source.chunk_id === item.chunk_id) ?? null;
+      return [
+        `${index + 1}. ${resultTitle(item, index)}`,
+        `   Source: ${evidenceCitationLabel(item, citation, index)}`,
+        `   Score: final=${scoreText(item.final_score ?? item.score)}, rerank=${scoreText(item.rerank_score)}`,
+        `   Excerpt: ${resultExcerpt(item).slice(0, 360)}`,
+      ].join("\n");
+    })
+    .join("\n");
+
+  return [
+    "Maintenance Experience Candidate",
+    "",
+    "Candidate status: unreviewed, not approved knowledge",
+    "",
+    `Title: ${titleParts.join(" - ")}`,
+    `Category: maintenance`,
+    `Equipment model: ${equipmentModel.trim() || "Not provided"}`,
+    `Fault code: ${faultCode.trim() || "Not provided"}`,
+    "",
+    "Observed trigger or symptom",
+    symptom.trim() || "Not provided",
+    "",
+    "Candidate experience summary",
+    response.answer,
+    "",
+    "Applicability guardrails",
+    "- Use only for the equipment model, fault code, and conditions confirmed by cited sources.",
+    "- Do not generalize to similar equipment without additional evidence.",
+    "- Require maintenance owner review before adding to a formal knowledge base.",
+    "",
+    "Source citations",
+    response.citations.map((item, index) => `${index + 1}. ${citationLabel(item)}`).join("\n") || "No citations returned.",
+    "",
+    "Supporting evidence",
+    evidence || "No retrieved evidence returned.",
+    "",
+    "Suggested curation checks",
+    "- Confirm the answer is grounded in the cited documents.",
+    "- Confirm safety notes are complete for shutdown, lockout, wiring, or disassembly.",
+    "- Decide whether this is reusable experience or a one-off incident.",
+  ].join("\n");
+}
+
 export function MaintenanceKnowledgePage() {
   const [equipmentModel, setEquipmentModel] = useState("");
   const [faultCode, setFaultCode] = useState("");
@@ -157,6 +216,7 @@ export function MaintenanceKnowledgePage() {
   const [citedOnly, setCitedOnly] = useState(false);
   const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState("");
+  const [candidateCopyStatus, setCandidateCopyStatus] = useState("");
 
   const metadataFilter = useMemo(() => {
     const filter: Record<string, string> = { category: "maintenance" };
@@ -196,11 +256,25 @@ export function MaintenanceKnowledgePage() {
         : "",
     [equipmentModel, evidenceResults, faultCode, notes, response, symptom],
   );
+  const maintenanceExperienceCandidate = useMemo(
+    () =>
+      response
+        ? buildMaintenanceExperienceCandidate({
+            equipmentModel,
+            faultCode,
+            symptom,
+            response,
+            evidenceResults,
+          })
+        : "",
+    [equipmentModel, evidenceResults, faultCode, response, symptom],
+  );
 
   useEffect(() => {
     setCitedOnly(false);
     setSelectedEvidenceKey(evidenceResults[0] ? resultKey(evidenceResults[0], 0) : null);
     setCopyStatus("");
+    setCandidateCopyStatus("");
   }, [evidenceResults]);
 
   async function copyRecordDraft() {
@@ -210,6 +284,16 @@ export function MaintenanceKnowledgePage() {
       setCopyStatus("Draft copied");
     } catch {
       setCopyStatus("Copy failed");
+    }
+  }
+
+  async function copyExperienceCandidate() {
+    if (!maintenanceExperienceCandidate) return;
+    try {
+      await navigator.clipboard.writeText(maintenanceExperienceCandidate);
+      setCandidateCopyStatus("Candidate copied");
+    } catch {
+      setCandidateCopyStatus("Copy failed");
     }
   }
 
@@ -441,6 +525,30 @@ export function MaintenanceKnowledgePage() {
               </div>
               {copyStatus && <p className={copyStatus === "Draft copied" ? "success" : "error"}>{copyStatus}</p>}
               <pre className="record-draft-preview">{maintenanceRecordDraft}</pre>
+            </div>
+          )}
+
+          {maintenanceExperienceCandidate && (
+            <div className="subtle-block maintenance-experience-candidate">
+              <div className="section-heading">
+                <div>
+                  <h3>Maintenance experience candidate</h3>
+                  <p className="muted">
+                    Unreviewed candidate for future knowledge curation. It is not saved or approved by CoreKB.
+                  </p>
+                </div>
+                <button type="button" onClick={copyExperienceCandidate}>
+                  Copy candidate
+                </button>
+              </div>
+              {candidateCopyStatus && (
+                <p className={candidateCopyStatus === "Candidate copied" ? "success" : "error"}>{candidateCopyStatus}</p>
+              )}
+              <div className="experience-candidate-summary">
+                <span className="status-pill status-warning">Unreviewed</span>
+                <span>Requires maintenance owner review before becoming formal knowledge.</span>
+              </div>
+              <pre className="record-draft-preview">{maintenanceExperienceCandidate}</pre>
             </div>
           )}
         </div>
