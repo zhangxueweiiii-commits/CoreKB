@@ -46,6 +46,7 @@ The UI displays:
 - rerank status
 - no-answer state
 - evidence panel when retrieved evidence is returned by the API
+- maintenance record draft for copy/paste review
 
 ## Evidence Panel
 
@@ -65,6 +66,24 @@ Users can enable a cited-only view to focus on evidence that was actually refere
 
 The evidence panel does not rerun search, rerank, or chat. It does not persist evidence inspection state. It only renders response data returned by the existing assistant endpoint.
 
+## Maintenance Record Draft
+
+The Maintenance page can generate a local repair record draft after the assistant returns an answer.
+
+The draft includes:
+
+- equipment model and fault code entered by the user
+- reported symptom and site notes
+- assistant guidance
+- no-answer state
+- used metadata filter
+- rerank status
+- citations
+- top retrieved evidence summaries
+- an operator confirmation checklist
+
+The draft is intended for copy/paste into an existing reviewed maintenance process. It is not persisted by CoreKB and must be reviewed by a human before use.
+
 ## Boundaries
 
 This MVP does not:
@@ -79,6 +98,8 @@ This MVP does not:
 - trigger reindexing
 - change prompts or rerank configuration dynamically
 - persist evidence inspection state
+- persist maintenance record drafts
+- create work orders or repair tickets
 
 It is a focused UI wrapper around existing RAG, metadata filter, rerank, and citation behavior.
 

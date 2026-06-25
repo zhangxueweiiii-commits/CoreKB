@@ -845,6 +845,23 @@ blockquote {
   max-height: 340px;
 }
 
+.maintenance-record-draft {
+  display: grid;
+  gap: 12px;
+}
+
+.record-draft-preview {
+  background: #172026;
+  border-radius: 8px;
+  color: #eef5f7;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 980px) {
   .maintenance-grid {
     grid-template-columns: 1fr;
