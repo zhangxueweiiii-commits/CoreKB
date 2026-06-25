@@ -263,6 +263,18 @@ export interface MaintenanceKnowledgeEntry {
   updated_at: string;
 }
 
+export interface MaintenanceKnowledgeSearchResponse {
+  query?: string | null;
+  equipment_model?: string | null;
+  fault_code?: string | null;
+  total: number;
+  items: Array<{
+    entry: MaintenanceKnowledgeEntry;
+    score: number;
+    matched_fields: string[];
+  }>;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem("corekb_token");
 }
@@ -448,6 +460,14 @@ export const api = {
     }),
   maintenanceExperienceCandidates: (statusFilter = "pending") =>
     request<MaintenanceExperienceCandidate[]>(`/maintenance/experience-candidates?status_filter=${statusFilter}`),
+  maintenanceKnowledgeSearch: (params: { query?: string; equipment_model?: string; fault_code?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && String(value).trim()) search.set(key, String(value));
+    });
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return request<MaintenanceKnowledgeSearchResponse>(`/maintenance/knowledge-search${suffix}`);
+  },
   acceptMaintenanceExperienceCandidate: (candidateId: string, reviewerNote?: string) =>
     request<{ candidate: MaintenanceExperienceCandidate; knowledge_entry: MaintenanceKnowledgeEntry }>(
       `/maintenance/experience-candidates/${candidateId}/accept`,

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, type AssistantChatResponse, type MaintenanceExperienceCandidate } from "../api/client";
+import { api, type AssistantChatResponse, type MaintenanceExperienceCandidate, type MaintenanceKnowledgeSearchResponse } from "../api/client";
 
 const QUICK_QUERIES = [
   { label: "Fault code handling", symptom: "Fault alarm is active. Need meaning, checks, and handling steps." },
@@ -238,6 +238,10 @@ export function MaintenanceKnowledgePage() {
   const [curationError, setCurationError] = useState("");
   const [pendingCandidates, setPendingCandidates] = useState<MaintenanceExperienceCandidate[]>([]);
   const [reviewerNote, setReviewerNote] = useState("");
+  const [knowledgeSearchQuery, setKnowledgeSearchQuery] = useState("");
+  const [knowledgeSearchResult, setKnowledgeSearchResult] = useState<MaintenanceKnowledgeSearchResponse | null>(null);
+  const [knowledgeSearchStatus, setKnowledgeSearchStatus] = useState("");
+  const [knowledgeSearchError, setKnowledgeSearchError] = useState("");
 
   const metadataFilter = useMemo(() => {
     const filter: Record<string, string> = { category: "maintenance" };
@@ -401,6 +405,24 @@ export function MaintenanceKnowledgePage() {
     }
   }
 
+  async function searchAcceptedKnowledge() {
+    setKnowledgeSearchStatus("Searching accepted maintenance knowledge...");
+    setKnowledgeSearchError("");
+    try {
+      const result = await api.maintenanceKnowledgeSearch({
+        query: knowledgeSearchQuery.trim() || symptom.trim() || faultCode.trim() || equipmentModel.trim(),
+        equipment_model: equipmentModel.trim() || undefined,
+        fault_code: faultCode.trim() || undefined,
+        limit: 10,
+      });
+      setKnowledgeSearchResult(result);
+      setKnowledgeSearchStatus(`Found ${result.total} accepted entr${result.total === 1 ? "y" : "ies"}`);
+    } catch (err) {
+      setKnowledgeSearchError(err instanceof Error ? err.message : "Unable to search accepted knowledge");
+      setKnowledgeSearchStatus("");
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setRunning(true);
@@ -482,6 +504,58 @@ export function MaintenanceKnowledgePage() {
       </form>
 
       {error && <p className="error">{error}</p>}
+
+      <div className="subtle-block maintenance-knowledge-search">
+        <div className="section-heading">
+          <div>
+            <h3>Accepted knowledge retrieval</h3>
+            <p className="muted">Search human-accepted maintenance knowledge entries before or after asking the assistant.</p>
+          </div>
+          <button type="button" onClick={searchAcceptedKnowledge}>
+            Search accepted knowledge
+          </button>
+        </div>
+        <label>
+          Retrieval query
+          <input
+            value={knowledgeSearchQuery}
+            onChange={(event) => setKnowledgeSearchQuery(event.target.value)}
+            placeholder="Use symptom, equipment model, fault code, or handling keywords"
+          />
+        </label>
+        {knowledgeSearchStatus && <p className="success">{knowledgeSearchStatus}</p>}
+        {knowledgeSearchError && <p className="error">{knowledgeSearchError}</p>}
+        {knowledgeSearchResult && (
+          <div className="knowledge-entry-list">
+            {knowledgeSearchResult.items.length === 0 ? (
+              <p className="empty-state">No accepted maintenance knowledge matched the current query.</p>
+            ) : (
+              knowledgeSearchResult.items.map((item) => (
+                <article key={item.entry.id} className="knowledge-entry-card">
+                  <div className="search-result-header">
+                    <span className="status-pill status-indexed">{item.entry.status}</span>
+                    <span className="muted">score {item.score.toFixed(2)}</span>
+                  </div>
+                  <h4>{item.entry.title}</h4>
+                  <dl className="detail-list">
+                    <dt>Equipment</dt>
+                    <dd>{item.entry.equipment_model || "-"}</dd>
+                    <dt>Fault code</dt>
+                    <dd>{item.entry.fault_code || "-"}</dd>
+                    <dt>Matched</dt>
+                    <dd>{item.matched_fields.join(", ") || "-"}</dd>
+                    <dt>Evidence</dt>
+                    <dd>{item.entry.evidence_references.length} reference(s)</dd>
+                  </dl>
+                  <p><strong>Symptom:</strong> {item.entry.fault_symptom}</p>
+                  {item.entry.root_cause && <p><strong>Root cause:</strong> {item.entry.root_cause}</p>}
+                  <pre className="search-result-snippet">{item.entry.solution}</pre>
+                </article>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       {response && (
         <div className="answer maintenance-answer">

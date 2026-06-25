@@ -49,6 +49,7 @@ The UI displays:
 - maintenance record draft save/copy workflow
 - maintenance experience candidate save/review workflow
 - pending candidate review and accept/reject actions
+- accepted maintenance knowledge retrieval
 
 ## Evidence Panel
 
@@ -143,6 +144,20 @@ maintenance.knowledge_entry.create
 
 Accepted entries do not overwrite manuals, SOPs, source documents, or document metadata. This first version does not automatically index accepted entries; indexing can be added later as a normal single-entry indexing path with its own audit and tests.
 
+## Accepted Knowledge Retrieval
+
+Accepted maintenance knowledge entries can be searched from the Maintenance page.
+
+The retrieval pack searches controlled `maintenance_knowledge_entries` records with status `active`. It supports:
+
+- free-text query
+- equipment model filter
+- fault code filter
+- lightweight relevance scoring
+- matched field display
+
+The first retrieval version is SQL-backed and read-only. It does not query Qdrant, create embeddings, modify accepted entries, modify source documents, modify metadata, or trigger indexing. Pending and rejected candidates are not returned by accepted knowledge retrieval.
+
 ## Boundaries
 
 This MVP does not:
@@ -162,6 +177,7 @@ This MVP does not:
 - automatically accept candidates
 - batch process candidates
 - batch reindex
+- vector-index accepted knowledge entries automatically
 
 It is a focused UI wrapper around existing RAG, metadata filter, rerank, and citation behavior.
 
