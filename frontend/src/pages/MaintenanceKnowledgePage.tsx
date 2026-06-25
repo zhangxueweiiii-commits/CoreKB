@@ -75,6 +75,77 @@ function visibleMetadataEntries(metadata: Record<string, unknown>) {
     .slice(0, 12);
 }
 
+function buildMaintenanceRecordDraft(params: {
+  equipmentModel: string;
+  faultCode: string;
+  symptom: string;
+  notes: string;
+  response: AssistantChatResponse;
+  evidenceResults: EvidenceResult[];
+}) {
+  const { equipmentModel, faultCode, symptom, notes, response, evidenceResults } = params;
+  const citations = response.citations
+    .slice(0, 5)
+    .map((item, index) => `${index + 1}. ${citationLabel(item)}\n   Quote: ${item.quote}`)
+    .join("\n");
+  const evidence = evidenceResults
+    .slice(0, 5)
+    .map((item, index) => {
+      const metadata = resultMetadata(item);
+      const metadataText = visibleMetadataEntries(metadata)
+        .map(([key, value]) => `${key}=${String(value)}`)
+        .join(", ");
+      return [
+        `${index + 1}. ${resultTitle(item, index)}`,
+        `   Rank: ${item.rank || index + 1}; final=${scoreText(item.final_score ?? item.score)}; vector=${scoreText(item.vector_score)}; rerank=${scoreText(item.rerank_score)}`,
+        metadataText ? `   Metadata: ${metadataText}` : "",
+        `   Excerpt: ${resultExcerpt(item).slice(0, 500)}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n");
+
+  return [
+    "Maintenance Record Draft",
+    "",
+    "Review status: human review required before use",
+    "",
+    "Equipment",
+    `- Model: ${equipmentModel.trim() || "Not provided"}`,
+    `- Fault code: ${faultCode.trim() || "Not provided"}`,
+    "",
+    "Reported symptom",
+    symptom.trim() || "Not provided",
+    "",
+    "Site notes",
+    notes.trim() || "Not provided",
+    "",
+    "Assistant guidance",
+    response.answer,
+    "",
+    "No-answer state",
+    response.no_answer_detected ? "No reliable basis found in the current knowledge base." : "Answered with retrieved sources.",
+    "",
+    "Used metadata filter",
+    JSON.stringify(response.used_metadata_filter, null, 2),
+    "",
+    "Rerank",
+    response.rerank_applied ? "Applied" : response.rerank_error || "Not applied",
+    "",
+    "Citations",
+    citations || "No citations returned.",
+    "",
+    "Retrieved evidence",
+    evidence || "No retrieved evidence returned.",
+    "",
+    "Operator confirmation checklist",
+    "- Confirm source citations match the actual equipment and fault.",
+    "- Confirm safety conditions before shutdown, lockout, wiring, or disassembly.",
+    "- Confirm the final action with site procedure and responsible engineer.",
+  ].join("\n");
+}
+
 export function MaintenanceKnowledgePage() {
   const [equipmentModel, setEquipmentModel] = useState("");
   const [faultCode, setFaultCode] = useState("");
@@ -85,6 +156,7 @@ export function MaintenanceKnowledgePage() {
   const [error, setError] = useState("");
   const [citedOnly, setCitedOnly] = useState(false);
   const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState("");
 
   const metadataFilter = useMemo(() => {
     const filter: Record<string, string> = { category: "maintenance" };
@@ -110,11 +182,36 @@ export function MaintenanceKnowledgePage() {
     [citedChunkIds, citedOnly, evidenceResults],
   );
   const selectedEvidence = visibleEvidence.find((result, index) => resultKey(result, index) === selectedEvidenceKey) ?? visibleEvidence[0];
+  const maintenanceRecordDraft = useMemo(
+    () =>
+      response
+        ? buildMaintenanceRecordDraft({
+            equipmentModel,
+            faultCode,
+            symptom,
+            notes,
+            response,
+            evidenceResults,
+          })
+        : "",
+    [equipmentModel, evidenceResults, faultCode, notes, response, symptom],
+  );
 
   useEffect(() => {
     setCitedOnly(false);
     setSelectedEvidenceKey(evidenceResults[0] ? resultKey(evidenceResults[0], 0) : null);
+    setCopyStatus("");
   }, [evidenceResults]);
+
+  async function copyRecordDraft() {
+    if (!maintenanceRecordDraft) return;
+    try {
+      await navigator.clipboard.writeText(maintenanceRecordDraft);
+      setCopyStatus("Draft copied");
+    } catch {
+      setCopyStatus("Copy failed");
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -328,6 +425,22 @@ export function MaintenanceKnowledgePage() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {maintenanceRecordDraft && (
+            <div className="subtle-block maintenance-record-draft">
+              <div className="section-heading">
+                <div>
+                  <h3>Maintenance record draft</h3>
+                  <p className="muted">Local draft only. Review citations and site conditions before using it in any repair record.</p>
+                </div>
+                <button type="button" onClick={copyRecordDraft}>
+                  Copy draft
+                </button>
+              </div>
+              {copyStatus && <p className={copyStatus === "Draft copied" ? "success" : "error"}>{copyStatus}</p>}
+              <pre className="record-draft-preview">{maintenanceRecordDraft}</pre>
             </div>
           )}
         </div>
