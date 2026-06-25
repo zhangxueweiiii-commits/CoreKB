@@ -867,6 +867,35 @@ blockquote {
   padding: 10px 12px;
 }
 
+.maintenance-review-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.candidate-review-list {
+  display: grid;
+  gap: 14px;
+}
+
+.candidate-review-card {
+  border: 1px solid #e3e9ed;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button.secondary {
+  background: #eef5f7;
+  color: #31444d;
+}
+
 .record-draft-preview {
   background: #172026;
   border-radius: 8px;

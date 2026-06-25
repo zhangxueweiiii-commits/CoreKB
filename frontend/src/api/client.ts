@@ -204,6 +204,65 @@ export interface RetryIndexingResponse {
   created_at: string;
 }
 
+export interface MaintenanceRecordDraft {
+  id: string;
+  equipment_model?: string | null;
+  fault_symptom: string;
+  fault_code?: string | null;
+  assistant_answer_snapshot: string;
+  selected_evidence_snapshot: Array<Record<string, unknown>>;
+  citation_metadata: Array<Record<string, unknown>>;
+  metadata_filter_used: Record<string, unknown>;
+  rerank_state: Record<string, unknown>;
+  draft_text: string;
+  status: "draft";
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MaintenanceExperienceCandidate {
+  id: string;
+  title: string;
+  equipment_model?: string | null;
+  fault_code?: string | null;
+  fault_symptom: string;
+  root_cause_candidate?: string | null;
+  effective_handling_method: string;
+  ineffective_handling_method?: string | null;
+  spare_parts_involved?: string | null;
+  safety_notes?: string | null;
+  applicable_scope?: string | null;
+  evidence_references: Array<Record<string, unknown>>;
+  source_record_draft_id?: string | null;
+  status: "pending" | "accepted" | "rejected";
+  reviewer_note?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MaintenanceKnowledgeEntry {
+  id: string;
+  title: string;
+  equipment_model?: string | null;
+  fault_code?: string | null;
+  fault_symptom: string;
+  root_cause?: string | null;
+  solution: string;
+  spare_parts?: string | null;
+  evidence_references: Array<Record<string, unknown>>;
+  source_candidate_id: string;
+  status: "active" | "inactive";
+  created_by?: string | null;
+  accepted_by?: string | null;
+  accepted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem("corekb_token");
 }
@@ -353,5 +412,53 @@ export const api = {
     request<AssistantChatResponse>(`/assistants/${assistantType}/chat`, {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  createMaintenanceRecordDraft: (payload: {
+    equipment_model?: string | null;
+    fault_symptom: string;
+    fault_code?: string | null;
+    assistant_answer_snapshot: string;
+    selected_evidence_snapshot: Array<Record<string, unknown>>;
+    citation_metadata: Array<Record<string, unknown>>;
+    metadata_filter_used: Record<string, unknown>;
+    rerank_state: Record<string, unknown>;
+    draft_text: string;
+  }) =>
+    request<MaintenanceRecordDraft>("/maintenance/record-drafts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  createMaintenanceExperienceCandidate: (payload: {
+    title: string;
+    equipment_model?: string | null;
+    fault_code?: string | null;
+    fault_symptom: string;
+    root_cause_candidate?: string | null;
+    effective_handling_method: string;
+    ineffective_handling_method?: string | null;
+    spare_parts_involved?: string | null;
+    safety_notes?: string | null;
+    applicable_scope?: string | null;
+    evidence_references: Array<Record<string, unknown>>;
+    source_record_draft_id?: string | null;
+  }) =>
+    request<MaintenanceExperienceCandidate>("/maintenance/experience-candidates", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  maintenanceExperienceCandidates: (statusFilter = "pending") =>
+    request<MaintenanceExperienceCandidate[]>(`/maintenance/experience-candidates?status_filter=${statusFilter}`),
+  acceptMaintenanceExperienceCandidate: (candidateId: string, reviewerNote?: string) =>
+    request<{ candidate: MaintenanceExperienceCandidate; knowledge_entry: MaintenanceKnowledgeEntry }>(
+      `/maintenance/experience-candidates/${candidateId}/accept`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: reviewerNote || null }),
+      },
+    ),
+  rejectMaintenanceExperienceCandidate: (candidateId: string, reviewerNote?: string) =>
+    request<MaintenanceExperienceCandidate>(`/maintenance/experience-candidates/${candidateId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reviewer_note: reviewerNote || null }),
     }),
 };

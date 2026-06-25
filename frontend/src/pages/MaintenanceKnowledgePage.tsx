@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, type AssistantChatResponse } from "../api/client";
+import { api, type AssistantChatResponse, type MaintenanceExperienceCandidate } from "../api/client";
 
 const QUICK_QUERIES = [
   { label: "Fault code handling", symptom: "Fault alarm is active. Need meaning, checks, and handling steps." },
@@ -205,6 +205,21 @@ function buildMaintenanceExperienceCandidate(params: {
   ].join("\n");
 }
 
+function evidenceSnapshot(results: EvidenceResult[]) {
+  return results.slice(0, 5).map((item, index) => ({
+    rank: item.rank || index + 1,
+    document_id: item.document_id,
+    document_name: item.document_name || item.filename,
+    chunk_id: item.chunk_id,
+    chunk_excerpt: resultExcerpt(item).slice(0, 1200),
+    vector_score: item.vector_score,
+    rerank_score: item.rerank_score,
+    final_score: item.final_score ?? item.score,
+    metadata: resultMetadata(item),
+    citation: item.citation,
+  }));
+}
+
 export function MaintenanceKnowledgePage() {
   const [equipmentModel, setEquipmentModel] = useState("");
   const [faultCode, setFaultCode] = useState("");
@@ -217,6 +232,12 @@ export function MaintenanceKnowledgePage() {
   const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState("");
   const [candidateCopyStatus, setCandidateCopyStatus] = useState("");
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const [savedCandidateId, setSavedCandidateId] = useState<string | null>(null);
+  const [curationStatus, setCurationStatus] = useState("");
+  const [curationError, setCurationError] = useState("");
+  const [pendingCandidates, setPendingCandidates] = useState<MaintenanceExperienceCandidate[]>([]);
+  const [reviewerNote, setReviewerNote] = useState("");
 
   const metadataFilter = useMemo(() => {
     const filter: Record<string, string> = { category: "maintenance" };
@@ -294,6 +315,89 @@ export function MaintenanceKnowledgePage() {
       setCandidateCopyStatus("Candidate copied");
     } catch {
       setCandidateCopyStatus("Copy failed");
+    }
+  }
+
+  async function loadPendingCandidates() {
+    const items = await api.maintenanceExperienceCandidates("pending");
+    setPendingCandidates(items);
+  }
+
+  useEffect(() => {
+    loadPendingCandidates().catch(() => undefined);
+  }, []);
+
+  async function saveRecordDraft() {
+    if (!response || !maintenanceRecordDraft) return;
+    setCurationError("");
+    setCurationStatus("Saving draft...");
+    try {
+      const draft = await api.createMaintenanceRecordDraft({
+        equipment_model: equipmentModel.trim() || null,
+        fault_code: faultCode.trim() || null,
+        fault_symptom: symptom.trim() || "Not provided",
+        assistant_answer_snapshot: response.answer,
+        selected_evidence_snapshot: evidenceSnapshot(evidenceResults),
+        citation_metadata: response.citations,
+        metadata_filter_used: response.used_metadata_filter,
+        rerank_state: {
+          use_rerank: response.use_rerank,
+          rerank_applied: response.rerank_applied,
+          rerank_error: response.rerank_error,
+        },
+        draft_text: maintenanceRecordDraft,
+      });
+      setSavedDraftId(draft.id);
+      setCurationStatus(`Draft saved: ${draft.id}`);
+    } catch (err) {
+      setCurationError(err instanceof Error ? err.message : "Unable to save draft");
+      setCurationStatus("");
+    }
+  }
+
+  async function saveExperienceCandidate() {
+    if (!response) return;
+    setCurationError("");
+    setCurationStatus("Saving candidate...");
+    try {
+      const candidate = await api.createMaintenanceExperienceCandidate({
+        title: `${equipmentModel.trim() || "Unknown equipment"} - ${faultCode.trim() || "maintenance case"}`,
+        equipment_model: equipmentModel.trim() || null,
+        fault_code: faultCode.trim() || null,
+        fault_symptom: symptom.trim() || "Not provided",
+        root_cause_candidate: "",
+        effective_handling_method: response.answer,
+        ineffective_handling_method: "",
+        spare_parts_involved: "",
+        safety_notes: "Review source evidence and site safety requirements before reuse.",
+        applicable_scope: equipmentModel.trim() || "Review required",
+        evidence_references: evidenceSnapshot(evidenceResults),
+        source_record_draft_id: savedDraftId,
+      });
+      setSavedCandidateId(candidate.id);
+      setCurationStatus(`Candidate saved for review: ${candidate.id}`);
+      await loadPendingCandidates();
+    } catch (err) {
+      setCurationError(err instanceof Error ? err.message : "Unable to save candidate");
+      setCurationStatus("");
+    }
+  }
+
+  async function reviewCandidate(candidateId: string, action: "accept" | "reject") {
+    setCurationError("");
+    setCurationStatus(`${action === "accept" ? "Accepting" : "Rejecting"} candidate...`);
+    try {
+      if (action === "accept") {
+        await api.acceptMaintenanceExperienceCandidate(candidateId, reviewerNote);
+      } else {
+        await api.rejectMaintenanceExperienceCandidate(candidateId, reviewerNote);
+      }
+      setReviewerNote("");
+      setCurationStatus(`Candidate ${action === "accept" ? "accepted" : "rejected"}`);
+      await loadPendingCandidates();
+    } catch (err) {
+      setCurationError(err instanceof Error ? err.message : "Unable to review candidate");
+      setCurationStatus("");
     }
   }
 
@@ -522,6 +626,9 @@ export function MaintenanceKnowledgePage() {
                 <button type="button" onClick={copyRecordDraft}>
                   Copy draft
                 </button>
+                <button type="button" onClick={saveRecordDraft}>
+                  Save draft
+                </button>
               </div>
               {copyStatus && <p className={copyStatus === "Draft copied" ? "success" : "error"}>{copyStatus}</p>}
               <pre className="record-draft-preview">{maintenanceRecordDraft}</pre>
@@ -540,6 +647,9 @@ export function MaintenanceKnowledgePage() {
                 <button type="button" onClick={copyExperienceCandidate}>
                   Copy candidate
                 </button>
+                <button type="button" onClick={saveExperienceCandidate}>
+                  Save candidate
+                </button>
               </div>
               {candidateCopyStatus && (
                 <p className={candidateCopyStatus === "Candidate copied" ? "success" : "error"}>{candidateCopyStatus}</p>
@@ -551,6 +661,54 @@ export function MaintenanceKnowledgePage() {
               <pre className="record-draft-preview">{maintenanceExperienceCandidate}</pre>
             </div>
           )}
+
+          <div className="subtle-block maintenance-review-panel">
+            <div className="section-heading">
+              <div>
+                <h3>Candidate review</h3>
+                <p className="muted">Pending candidates require explicit accept or reject. Accepted candidates become controlled maintenance knowledge entries.</p>
+              </div>
+              <button type="button" onClick={loadPendingCandidates}>Refresh</button>
+            </div>
+            {curationStatus && <p className="success">{curationStatus}</p>}
+            {curationError && <p className="error">{curationError}</p>}
+            <label>
+              Reviewer note
+              <textarea value={reviewerNote} onChange={(event) => setReviewerNote(event.target.value)} placeholder="Reason for accept or reject" />
+            </label>
+            {savedDraftId && <p className="muted">Linked draft id: {savedDraftId}</p>}
+            {savedCandidateId && <p className="muted">Latest candidate id: {savedCandidateId}</p>}
+            {pendingCandidates.length === 0 ? (
+              <p className="empty-state">No pending maintenance experience candidates.</p>
+            ) : (
+              <div className="candidate-review-list">
+                {pendingCandidates.map((candidate) => (
+                  <article key={candidate.id} className="candidate-review-card">
+                    <div className="search-result-header">
+                      <span className="status-pill status-warning">{candidate.status}</span>
+                      <span className="muted">{new Date(candidate.created_at).toLocaleString()}</span>
+                    </div>
+                    <h4>{candidate.title}</h4>
+                    <dl className="detail-list">
+                      <dt>Equipment</dt>
+                      <dd>{candidate.equipment_model || "-"}</dd>
+                      <dt>Fault code</dt>
+                      <dd>{candidate.fault_code || "-"}</dd>
+                      <dt>Symptom</dt>
+                      <dd>{candidate.fault_symptom}</dd>
+                      <dt>Evidence</dt>
+                      <dd>{candidate.evidence_references.length} item(s)</dd>
+                    </dl>
+                    <pre className="search-result-snippet">{candidate.effective_handling_method}</pre>
+                    <div className="row-actions">
+                      <button type="button" onClick={() => reviewCandidate(candidate.id, "accept")}>Accept</button>
+                      <button type="button" className="secondary" onClick={() => reviewCandidate(candidate.id, "reject")}>Reject</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

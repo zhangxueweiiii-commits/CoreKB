@@ -14,6 +14,7 @@ from app.models.evaluation_regression import EvaluationRegression
 from app.models.evaluation_triage_note import EvaluationFailureTriageNote
 from app.models.index_job import IndexJob, IndexJobItem
 from app.models.knowledge_base import KBPermission, KnowledgeBase
+from app.models.maintenance import MaintenanceExperienceCandidate, MaintenanceKnowledgeEntry, MaintenanceRecordDraft
 from app.models.metadata_dictionary import MetadataDictionaryEntry
 from app.models.audit_log import AuditLog
 from app.models.alert_event import AlertEvent
@@ -37,6 +38,9 @@ def db_session() -> Generator[Session, None, None]:
         KnowledgeBase.__table__,
         KBPermission.__table__,
         MetadataDictionaryEntry.__table__,
+        MaintenanceRecordDraft.__table__,
+        MaintenanceExperienceCandidate.__table__,
+        MaintenanceKnowledgeEntry.__table__,
         Document.__table__,
         DocumentChunk.__table__,
         DocumentMetadataSuggestion.__table__,
