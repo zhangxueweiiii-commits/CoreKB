@@ -47,6 +47,7 @@ The UI displays:
 - no-answer state
 - evidence panel when retrieved evidence is returned by the API
 - maintenance record draft for copy/paste review
+- maintenance experience candidate for knowledge curation review
 
 ## Evidence Panel
 
@@ -84,6 +85,24 @@ The draft includes:
 
 The draft is intended for copy/paste into an existing reviewed maintenance process. It is not persisted by CoreKB and must be reviewed by a human before use.
 
+## Maintenance Experience Candidate
+
+The Maintenance page can also generate a local experience candidate from the current answer and evidence.
+
+The candidate includes:
+
+- candidate title
+- maintenance category
+- equipment model and fault code
+- observed symptom
+- candidate experience summary
+- applicability guardrails
+- source citations
+- supporting evidence
+- curation checks
+
+This is a drafting aid for future knowledge curation. It is explicitly marked as unreviewed and not approved knowledge. A maintenance owner must review the source citations, applicability, and safety constraints before the content is added to any formal knowledge base.
+
 ## Boundaries
 
 This MVP does not:
@@ -99,7 +118,9 @@ This MVP does not:
 - change prompts or rerank configuration dynamically
 - persist evidence inspection state
 - persist maintenance record drafts
+- persist maintenance experience candidates
 - create work orders or repair tickets
+- update source documents or formal knowledge entries
 
 It is a focused UI wrapper around existing RAG, metadata filter, rerank, and citation behavior.
 

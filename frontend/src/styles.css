@@ -850,6 +850,23 @@ blockquote {
   gap: 12px;
 }
 
+.maintenance-experience-candidate {
+  display: grid;
+  gap: 12px;
+}
+
+.experience-candidate-summary {
+  align-items: center;
+  background: #fff8e8;
+  border: 1px solid #f0d48b;
+  border-radius: 8px;
+  color: #6f5310;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
 .record-draft-preview {
   background: #172026;
   border-radius: 8px;
